@@ -1,0 +1,92 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual Environments
+.venv/
+venv/
+ENV/
+env/
+.virtualenv/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Pytest
+.pytest_cache/
+.cache/
+.coverage
+htmlcov/
+*.log
+
+# Ruff
+.ruff_cache/
+
+# Mypy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Logs and Reports
+logs/
+*.log
+final_report.json
+plus_metadata.json
+!logs/.gitkeep
+
+# Test Reports
+report.html
+assets/
+screenshots/
+test-results/
+
+# Environment variables
+.env
+.env.local
+*.env
+
+# OS
+Thumbs.db
+.DS_Store
+
+# Temporary files
+*.tmp
+*.bak
+*.swp
+*~
+
+# Selenium
+chromedriver
+geckodriver
+msedgedriver
+selenium-manager/
+
+# Project specific
+config/secrets.json
+*.local.json
