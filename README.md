@@ -526,8 +526,9 @@ poetry run pytest
 # Run with specific browser
 poetry run pytest --browser firefox --interactive
 
-# Run all browsers in parallel
-poetry run pytest --all-browsers -n 3
+# Run all browsers
+poetry run pytest --all-browsers # sequentially
+poetry run pytest --all-browsers -n 3 # in parallel
 
 # Run specific test file
 poetry run pytest tests/test_example.py
