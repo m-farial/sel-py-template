@@ -17,6 +17,7 @@ selenium = "^4.0"
 webdriver-manager = "^4.0.2"
 pytest-xdist = "^3.8.0"
 pytest-html-plus = "^0.4.2"
+dulwich = "^0.21.0"
 
 [[tool.poetry.packages]]
 include = "sel_py_template"
@@ -108,7 +109,8 @@ for p in Path('.').rglob('__pycache__'):
 
 [tool.pytest.ini_options]
 minversion = "7.0"
-addopts = "-q"
+addopts = "-q "
+report_title = "Selenium Python Template Test Report"
 
 [tool.mypy]
 python_version = "3.10"

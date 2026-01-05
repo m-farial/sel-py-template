@@ -1,0 +1,28 @@
+version: 2
+updates:
+  # Poetry dependencies
+  - package-ecosystem: "pip"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "saturday"
+      time: "03:00"
+    auto-merge-minor: true  # Auto-merge minor/patch updates
+    groups:
+      development:
+        dependency-types:
+          - "dev"
+    open-pull-requests-limit: 10
+    reviewers:
+      - "your-username"
+    labels:
+      - "dependencies"
+    commit-message:
+      prefix: "chore"
+      include: "scope"
+  
+  # GitHub Actions
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"

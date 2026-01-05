@@ -14,11 +14,15 @@ from selenium.webdriver.firefox.options import Options as FirefoxOptions
 from selenium.webdriver.firefox.service import Service as FirefoxService
 from selenium.webdriver.remote.webdriver import WebDriver
 
+from src.utils.logger_util import LoggerFactory
 from src.utils.report_plugin import ReportPlugin
 
-date_folder = datetime.now().strftime("%m-%d-%Y")
-LOG_PATH1 = os.path.join("logs", date_folder)
-LOG_PATH = os.path.join(os.getcwd(), "logs", date_folder)
+date_str = datetime.now().strftime("%m-%d-%Y")
+LOG_PATH = os.path.join(os.getcwd(), "logs", date_str)
+# Configure pytest-html report location
+REPORT_DIR = os.path.join(LOG_PATH, "reports")
+LoggerFactory.set_log_dir(LOG_PATH)
+LoggerFactory.set_report_dir(REPORT_DIR)
 logger = logging.getLogger(__name__)
 
 
@@ -47,7 +51,7 @@ def add_stream_handler(
 def pytest_configure(config):
     """Register ReportPlugin only after pytest-html is available."""
     os.makedirs(LOG_PATH, exist_ok=True)
-
+    os.makedirs(REPORT_DIR, exist_ok=True)
     # Determine browser for plugin registration
     browser: str = config.getoption("--browser") or "generic"
     if config.getoption("--all-browsers"):
@@ -59,12 +63,8 @@ def pytest_configure(config):
     config.pluginmanager.register(plugin, name=f"test_plugin_{browser}")
     # Configure logging
     add_stream_handler(logging.getLogger(), level=logging.INFO, stream=sys.stdout)
-    # Configure pytest-html report location
-    report_file: str = os.path.join(LOG_PATH, "report.html")
-    config.option.htmlpath = report_file
-    # Configure pytest-html-plus (if available)
-    screenshots_dir: str = os.path.join(LOG_PATH, "screenshots")
-    os.makedirs(screenshots_dir, exist_ok=True)
+    # Configure pytest-html-plus screenshots
+    final_report_json_report_path = os.path.join(REPORT_DIR, "final_report.json")
 
     if not hasattr(config, "option"):
         logger.warning(
@@ -74,9 +74,9 @@ def pytest_configure(config):
     else:
         # Set pytest-html-plus output folder so it writes assets/json into the same date folder
         # pytest-html-plus registers the CLI option as "--html-output" with dest `html_output`
-        config.option.html_output = LOG_PATH
-        config.option.screenshots = screenshots_dir
-        logger.info("pytest-html-plus screenshots directory: %s", screenshots_dir)
+        config.option.html_output = REPORT_DIR
+        config.option.screenshots = REPORT_DIR
+        config.option.json_report = final_report_json_report_path
     # Configure session logger
     sess_logger: logging.Logger | None = getattr(config, "_logger", None)
     if sess_logger:
@@ -116,6 +116,15 @@ def pytest_addoption(parser: pytest.Parser) -> None:
         action="store_true",
         default=False,
         help="Run browsers in interactive mode (visible browser window)",
+    )
+    parser.addini(
+        "report_title", "Default report title", default="Sauce demo tests report"
+    )
+    parser.addoption(
+        "--report-title",
+        action="store",
+        default=None,
+        help="Custom report title (overrides pytest.ini)",
     )
 
 
