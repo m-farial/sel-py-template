@@ -1,13 +1,13 @@
 from datetime import datetime
+import json
 import logging
 import logging.config
 import os
-import shutil
-import subprocess
-import sys
 from typing import Any
 
+from dulwich.repo import Repo
 import pytest
+from pytest_html_plus.utils import get_python_version
 
 
 class ReportPlugin:
@@ -29,98 +29,31 @@ class ReportPlugin:
         self.configure_logging()
         self.session_logger = logging.getLogger(f"app.{self.browser}")
         config._logger = self.session_logger  # type: ignore
-
-    @staticmethod
-    def _get_git_executable() -> str | None:
-        """
-        Get the full path to git executable.
-
-        Returns:
-            Full path to git or None if not found
-        """
-        return shutil.which("git")
-
-    @staticmethod
-    def _is_git_repo() -> bool:
-        """
-        Check if current directory is a git repository.
-
-        Returns:
-            bool: True if in a git repository, False otherwise
-        """
-        git_path = ReportPlugin._get_git_executable()
-        if not git_path:
-            return False
-
-        try:
-            subprocess.run(  # noqa: S603
-                [git_path, "rev-parse", "--git-dir"],
-                capture_output=True,
-                shell=False,
-                check=True,
-                timeout=5,
-            )
-            return True
-        except (
-            subprocess.CalledProcessError,
-            FileNotFoundError,
-            subprocess.TimeoutExpired,
-        ):
-            return False
-
-    @staticmethod
-    def _run_git_command(command: list[str]) -> str | None:
-        """
-        Run a git command safely and return output.
-
-        Args:
-            command: Git command as list of strings (first element should be 'git')
-
-        Returns:
-            Command output if successful, None otherwise
-        """
-        git_path = ReportPlugin._get_git_executable()
-        if not git_path:
-            return None
-
-        if command[0] == "git":
-            command = [git_path, *command[1:]]
-
-        try:
-            result = subprocess.run(  # noqa: S603
-                command,
-                capture_output=True,
-                text=True,
-                check=False,
-                timeout=5,
-                stderr=subprocess.DEVNULL,
-            )
-            if result.returncode == 0 and result.stdout:
-                return result.stdout.strip()
-        except (subprocess.SubprocessError, FileNotFoundError, TimeoutError):
-            pass
-        return None
+        self.set_config_metadata(config)
 
     def _get_git_info(self) -> dict[str, str]:
         """
-        Get git branch and commit information.
+        Retrieve git branch and commit information.
 
         Returns:
-            Dict with 'branch' and 'commit' keys
+            Dictionary with 'branch' and 'commit' keys
         """
-        # Check if we're in a git repository first
-        if not self._is_git_repo():
-            return {"branch": "NA", "commit": "NA"}
+        git_info = {"branch": "NA", "commit": "NA"}
+        try:
+            repo = Repo(".")
+            head = repo.refs.read_ref(b"HEAD")
+            branch = head.decode().replace("refs/heads/", "").replace("ref: ", "")
+            # Get current commit
+            commit_sha = repo[b"HEAD"].id
+            commit = commit_sha.decode()[:7]
+            git_info["commit"] = commit if commit else "NA"
+            git_info["branch"] = branch if branch else "NA"
 
-        # Get branch name
-        branch = (
-            self._run_git_command(["git", "rev-parse", "--abbrev-ref", "HEAD"]) or "NA"
-        )
-
-        # Get commit hash
-        commit = self._run_git_command(["git", "rev-parse", "--short", "HEAD"]) or "NA"
-
-        return {"branch": branch, "commit": commit}
+        except ImportError:
+            self.session_logger.warning(
+                "Dulwich not installed; cannot retrieve git information."
+            )
+        return git_info
 
     def _get_environment_info(self) -> dict[str, Any]:
         """
@@ -129,18 +62,36 @@ class ReportPlugin:
         Returns:
             Dictionary containing environment details
         """
-        # Get git information
         git_info = self._get_git_info()
 
         return {
-            "report_title": datetime.now().strftime("%m-%d-%Y"),
-            "environment": "NA",  # Can be set via environment variable or config
             "branch": git_info["branch"],
             "commit": git_info["commit"],
-            "python_version": f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}",
+            "python_version": get_python_version(),
             "generated_at": datetime.now().isoformat(),
             "browser": self.browser,
         }
+
+    def set_config_metadata(self, config: pytest.Config) -> None:
+        """Set metadata for pytest-html-plus reports."""
+        env = self._get_environment_info()
+        # Precedence: cli_title > env_title > default
+        cli_title = config.getoption("report_title", None)
+        try:
+            ini_title = config.getini("report_title")
+        except Exception:
+            ini_title = None
+        env_title = os.getenv("REPORT_TITLE", None)
+        report_title = cli_title or ini_title or env_title or "Template tests report"
+        breakpoint()
+        if not getattr(config.option, "html_title", None):
+            config.option.html_title = report_title
+        config.option.environment = env.get("environment", "NA")
+        config.option.git_branch = env.get("branch", "NA")
+        config.option.git_commit = env.get("commit", "NA")
+        config.option.python_version = env.get("python_version", "NA")
+        config.option.browser = env.get("browser", "NA")
+        config.option.generated_at = env.get("generated_at", "NA")
 
     def configure_logging(self):
         logging_config = {
@@ -189,6 +140,7 @@ class ReportPlugin:
     def pytest_runtest_makereport(self, item: pytest.Item, call: pytest.CallInfo):
         outcome = yield
         report = outcome.get_result()
+        timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
         if report.when in ("call", "setup"):
             self.session_logger.info(f">> Started Test {report.nodeid}")
             report.description = str(item.function.__doc__)  # type: ignore
@@ -207,9 +159,22 @@ class ReportPlugin:
 
                 driver = item.funcargs.get("driver", None)  # type: ignore
                 report.driver = driver
-
-                if driver:
-                    timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+                # detection of pytest-html-plus (or similar html plugin)
+                config = getattr(item, "config", None)
+                html_plus_enabled = False
+                if config:
+                    pm = getattr(config, "pluginmanager", None)
+                    html_plus_enabled = bool(
+                        (
+                            pm
+                            and (
+                                pm.hasplugin("pytest_html_plus") or pm.hasplugin("html")
+                            )
+                        )
+                        or getattr(config.option, "html_output", None)
+                    )
+                # take screenshot only if driver exists AND html plugin is NOT enabled
+                if driver and not html_plus_enabled:
                     screenshot_path = os.path.join(
                         self.base_log_dir, f"{item.name}_{timestamp}.png"
                     )
@@ -221,7 +186,9 @@ class ReportPlugin:
                     )
 
                 # Write failure log
-                log_path = os.path.join(self.base_log_dir, f"{item.name}_failure.log")
+                log_path = os.path.join(
+                    self.base_log_dir, f"{item.name}_{timestamp}_failure.log"
+                )
                 with open(log_path, "w", encoding="utf-8") as f:
                     f.write(f"Test failed: {item.name}\n")
                     f.write(str(report.longrepr))
@@ -229,6 +196,42 @@ class ReportPlugin:
 
             else:
                 self.session_logger.info(f"xx Passed Test {report.nodeid}")
+
+    @pytest.hookimpl(tryfirst=True)
+    def pytest_sessionstart(self, session: pytest.Session):
+        """Write pytest-html-plus compatible plus_metadata.json into the report folder early.
+
+        This ensures the HTML generator can pick up git/branch info even when pytest-html-plus
+        does not pass through those values from the CLI.
+        """
+        try:
+            html_output = getattr(
+                getattr(session, "config", None), "option", None
+            ) and getattr(session.config.option, "html_output", None)
+
+            if html_output:
+                plus_meta_path = os.path.join(html_output, "plus_metadata.json")
+                with open(plus_meta_path, "w", encoding="utf-8") as pm:
+                    json.dump(
+                        {
+                            "report_title": session.config.option.html_title,
+                            "environment": session.config.option.environment,
+                            "branch": session.config.option.git_branch,
+                            "commit": session.config.option.git_commit,
+                            "python_version": session.config.option.python_version,
+                            "generated_at": session.config.option.generated_at,
+                            "browser": session.config.option.browser,
+                        },
+                        pm,
+                        indent=2,
+                    )
+
+        except Exception as e:
+            # Non-fatal; useful for diagnostics
+            if self.session_logger:
+                self.session_logger.debug(
+                    "Could not write plus_metadata.json at session start: %s", e
+                )
 
     # Hook: session summary
     @pytest.hookimpl(tryfirst=True)
@@ -239,6 +242,15 @@ class ReportPlugin:
         failed = sum(1 for t in self.test_reports if t["outcome"] == "failed")
         skipped = sum(1 for t in self.test_reports if t["outcome"] == "skipped")
 
+        env = self._get_environment_info()
+        environment = (
+            f"\n EXECUTION METADATA \n"
+            f"=====================\n"
+            f" Environment : {env.get('environment', 'NA')}\n"
+            f" Branch : {env.get('branch', 'NA')}\n"
+            f" Commit: {env.get('commit', 'NA')}\n"
+            f" Generated At : {env.get('generated_at', 'NA')}\n"
+        )
         summary = (
             f"\n TEST SUMMARY \n"
             f"=====================\n"
@@ -247,7 +259,7 @@ class ReportPlugin:
             f" Skipped: {skipped}\n"
             f" Total  : {total}\n"
         )
-        self.session_logger.info(summary)
+        self.session_logger.info(f"{environment}\n{summary}")
         for tr in self.test_reports:
             self.session_logger.info(
                 f"Test: {tr['nodeid']} - Outcome: {tr['outcome'].upper()} - Duration: {tr['duration']:.2f}s"

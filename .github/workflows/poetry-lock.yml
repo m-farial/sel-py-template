@@ -1,0 +1,32 @@
+name: Update Poetry Lock
+
+on:
+  pull_request:
+    paths:
+      - 'pyproject.toml'
+
+jobs:
+  lock:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          ref: ${{ github.head_ref }}
+      
+      - uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+      
+      - name: Install Poetry
+        uses: snok/install-poetry@v1
+      
+      - name: Update lock file
+        run: poetry lock --no-update
+      
+      - name: Commit lock file
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+          git add poetry.lock
+          git commit -m "chore: update poetry.lock" || echo "No changes"
+          git push
