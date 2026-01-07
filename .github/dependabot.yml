@@ -1,0 +1,37 @@
+version: 2
+updates:
+  # Poetry dependencies
+  - package-ecosystem: "pip"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "saturday"
+      time: "03:00"
+    groups:
+      development:
+        patterns:
+          - "pytest*"
+          - "dulwich*"
+      production:
+        patterns:
+          - "selenium*"
+          - "webdriver*"
+    open-pull-requests-limit: 10
+    reviewers:
+      - "m-farial"
+    labels:
+      - "dependencies"
+    commit-message:
+      prefix: "[Update]"
+      include: "scope"
+  
+  # GitHub Actions
+  - package-ecosystem: github-actions
+    target-branch: main
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      github-actions:
+        patterns:
+          - "*"  # Update all GitHub Actions
