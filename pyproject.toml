@@ -16,8 +16,8 @@ python = "^3.10"
 selenium = "^4.0"
 webdriver-manager = "^4.0.2"
 pytest-xdist = "^3.8.0"
-pytest-html-plus = "^0.4.2"
-dulwich = "^0.21.0"
+pytest-html-plus = "^0.4.7"
+dulwich = "^0.25.0"
 
 [[tool.poetry.packages]]
 include = "sel_py_template"
@@ -137,7 +137,7 @@ module = [
 ignore_missing_imports = true
 
 [tool.poetry.group.dev.dependencies]
-pytest = "^8.4.2"
+pytest = "^9.0.2"
 black = "^25.11.0"
 isort = "^7.0.0"
 ruff = "*"
