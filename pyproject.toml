@@ -155,7 +155,7 @@ safety = "^3.7.0"
 detect-secrets = "^1.5.0"
 requests = "^2.32.5"
 python-dotenv = "^1.2.1"
-poethepoet = "^0.38.0"
+poethepoet = "^0.40.0"
 
 [tool.poetry.scripts]
 fmt-lint = "scripts.fmt_lint:main"
