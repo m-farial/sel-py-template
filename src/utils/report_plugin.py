@@ -83,7 +83,6 @@ class ReportPlugin:
             ini_title = None
         env_title = os.getenv("REPORT_TITLE", None)
         report_title = cli_title or ini_title or env_title or "Template tests report"
-        breakpoint()
         if not getattr(config.option, "html_title", None):
             config.option.html_title = report_title
         config.option.environment = env.get("environment", "NA")
