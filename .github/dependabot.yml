@@ -10,12 +10,13 @@ updates:
     groups:
       development:
         patterns:
-          - "pytest*"
-          - "dulwich*"
+          - "pytest-xdist"
+          - "pytest-html-plus"
+          - "dulwich"
       production:
         patterns:
-          - "selenium*"
-          - "webdriver*"
+          - "selenium"
+          - "webdriver-manager"
     open-pull-requests-limit: 10
     reviewers:
       - "m-farial"
@@ -24,6 +25,15 @@ updates:
     commit-message:
       prefix: "[Update]"
       include: "scope"
+    # Only allow Dependabot to open PRs for direct (top-level) dependencies
+    allow:
+      - dependency-type: "direct"
+    ignore:
+      - dependency-name: "urllib3"
+      - dependency-name: "typer"
+      - dependency-name: "safety-schemas"
+      - dependency-name: "*"
+        update-types: ["version-update:semver-patch"]
   
   # GitHub Actions
   - package-ecosystem: github-actions
