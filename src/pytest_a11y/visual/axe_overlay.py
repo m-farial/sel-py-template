@@ -1,64 +1,52 @@
 """
-Per-violation screenshot strategy for a11y violations.
+Per-violation screenshot capture for a11y violations.
 
-Instead of one screenshot with all violations highlighted,
-capture individual screenshots for each violation.
+Captures individual screenshots for each violation with visual highlighting
+instead of one screenshot with all violations marked together.
 """
+from __future__ import annotations
+
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable, Mapping, Any
 from selenium.webdriver.remote.webdriver import WebDriver
 
-from typing_extensions import TypedDict
+from src.pytest_a11y.types import AxeViolation, AxeResults
 
 
 # ============================================================================
-# Types (updated)
-# ============================================================================
-
-class AxeNode(TypedDict, total=False):
-    target: list[str]
-    html: str
-    impact: str | None
-    failureSummary: str
-
-
-class AxeViolation(TypedDict, total=False):
-    id: str
-    description: str
-    impact: str | None
-    help: str
-    helpUrl: str
-    nodes: list[AxeNode]
-    page_url: str
-    tags: list[str]
-    screenshot_path: str | None  # NEW: path to per-violation screenshot
-
-
-class AxeResults(TypedDict):
-    violations: list[AxeViolation]
-
-
-# ============================================================================
-# Screenshot utilities
+# Types
 # ============================================================================
 
 @dataclass
 class ViolationScreenshot:
-    """Result of capturing a violation screenshot."""
+    """Result of capturing a single violation screenshot."""
     violation_id: str
     violation_index: int
     screenshot_path: Path
     marked_count: int
 
 
+# ============================================================================
+# Private utilities
+# ============================================================================
+
 def _iter_violation_selectors(
-    violation: AxeViolation, *, max_nodes: int | None = None
+    violation: AxeViolation,
+    *,
+    max_nodes: int | None = None,
 ) -> Iterable[str]:
     """
-    Yield selectors for a single violation.
+    Yield CSS selectors for nodes affected by this violation.
     
-    Filters out non-list targets and global selectors.
+    Filters out non-list targets and global selectors (html, body, *).
+    
+    Args:
+        violation: Single violation from axe results
+        max_nodes: Maximum number of nodes to yield (default: no limit)
+        
+    Yields:
+        CSS selector strings for affected elements
     """
     nodes: list[Mapping[str, Any]] = violation.get("nodes", [])
     
@@ -75,13 +63,31 @@ def _iter_violation_selectors(
 
 
 def _is_global_selector(selector: str) -> bool:
-    """Skip global/root selectors that don't help visually."""
+    """
+    Check if selector is a global/root element that doesn't help visually.
+    
+    Args:
+        selector: CSS selector string
+        
+    Returns:
+        True if selector is html, body, or *
+    """
     s = selector.strip().lower()
     return s in ("html", "body", "*")
 
 
 def _severity_color(impact: str | None) -> str:
-    """Map severity to a stable color."""
+    """
+    Map impact severity to a display color.
+    
+    Uses hex colors that are stable across browsers and headless environments.
+    
+    Args:
+        impact: Impact level from axe (critical, serious, moderate, minor)
+        
+    Returns:
+        Hex color code string
+    """
     impact_lower = (impact or "unknown").lower().strip()
     return {
         "critical": "#b00020",   # deep red
@@ -100,9 +106,20 @@ def _mark_selector_on_page(
     badge_offset_y: int = 0,
 ) -> bool:
     """
-    Mark a single selector on the page.
+    Mark a single selector on the current page with outline and badge.
     
-    Returns True if element was found and marked.
+    Adds a colored outline around the element and a fixed-position badge label
+    near the element's top-left corner.
+    
+    Args:
+        driver: Selenium WebDriver instance
+        selector: CSS selector to mark
+        label: Text label for the badge
+        color: Hex color code for the outline and badge
+        badge_offset_y: Vertical offset for badge positioning (default: 0)
+        
+    Returns:
+        True if element was found and marked, False if not found
     """
     result = driver.execute_script(
         """
@@ -145,6 +162,34 @@ def _mark_selector_on_page(
     return bool(result)
 
 
+def _cleanup_violation_marks(driver: WebDriver) -> None:
+    """
+    Remove all violation badges and outlines from the page.
+    
+    Cleans up visual markers added by _mark_selector_on_page().
+    This is best-effort - some styles may persist if set via classes.
+    
+    Args:
+        driver: Selenium WebDriver instance
+    """
+    driver.execute_script(
+        """
+        // Remove badges
+        document.querySelectorAll('.a11y-violation-badge').forEach(el => el.remove());
+        
+        // Remove outlines (best-effort)
+        document.querySelectorAll('[style*="outline"]').forEach(el => {
+            el.style.outline = '';
+            el.style.outlineOffset = '';
+        });
+        """
+    )
+
+
+# ============================================================================
+# Public API
+# ============================================================================
+
 def capture_violation_screenshot(
     driver: WebDriver,
     violation: AxeViolation,
@@ -158,17 +203,20 @@ def capture_violation_screenshot(
     """
     Capture a screenshot with only this violation highlighted.
     
+    Marks all affected elements for this violation with colored outlines
+    and badges, then captures a screenshot and cleans up the marks.
+    
     Args:
-        driver: Selenium WebDriver instance.
-        violation: Single AxeViolation dict.
-        violation_index: Index of violation (for naming/labeling).
-        screenshot_dir: Directory to save screenshot.
-        scroll_into_view: Scroll targets into view before capture.
-        max_nodes_per_violation: Limit targets per violation.
-        cleanup_after: Remove badges/outlines after screenshot.
+        driver: Selenium WebDriver instance
+        violation: Single violation from axe results
+        violation_index: Index of this violation (for file naming)
+        screenshot_dir: Directory to save screenshot file
+        scroll_into_view: Whether to scroll each element into view (default: True)
+        max_nodes_per_violation: Limit elements marked per violation (default: 10)
+        cleanup_after: Whether to remove marks after capture (default: True)
     
     Returns:
-        ViolationScreenshot with path and stats, or None if capture failed.
+        ViolationScreenshot with file path and stats, or None if no elements marked
     """
     screenshot_dir.mkdir(parents=True, exist_ok=True)
     
@@ -196,8 +244,8 @@ def capture_violation_screenshot(
             marked_count += 1
             badge_offset_y = (badge_offset_y + 14) % 56
     
+    # Skip if no elements were marked
     if marked_count == 0:
-        # No targets found, skip screenshot
         return None
     
     # Sync repaint before screenshot
@@ -221,21 +269,6 @@ def capture_violation_screenshot(
     )
 
 
-def _cleanup_violation_marks(driver: WebDriver) -> None:
-    """Remove all violation badges and outlines from the page."""
-    driver.execute_script(
-        """
-        // Remove badges
-        document.querySelectorAll('.a11y-violation-badge').forEach(el => el.remove());
-        
-        // Remove outlines (this is best-effort, may not catch all)
-        document.querySelectorAll('[style*="outline"]').forEach(el => {
-            el.style.outline = '';
-            el.style.outlineOffset = '';
-        });
-        """
-    )
-
 def capture_all_violations_individually(
     driver: WebDriver,
     results: AxeResults,
@@ -245,9 +278,21 @@ def capture_all_violations_individually(
     max_nodes_per_violation: int | None = 10,
 ) -> dict[str, str]:
     """
-    Capture individual screenshots for each violation.
+    Capture individual screenshots for each violation in results.
     
-    Returns dict mapping violation_id -> screenshot_path (as string).
+    Iterates through all violations, captures a screenshot for each one
+    with only that violation highlighted, and updates violation dicts
+    with screenshot_path in-place.
+    
+    Args:
+        driver: Selenium WebDriver instance
+        results: Complete AxeResults from axe.run()
+        screenshot_dir: Directory to save screenshots
+        scroll_into_view: Whether to scroll elements into view (default: True)
+        max_nodes_per_violation: Limit elements per violation (default: 10)
+    
+    Returns:
+        Dict mapping violation_id -> screenshot file path
     """
     screenshot_dir = Path(screenshot_dir)
     screenshot_paths: dict[str, str] = {}
@@ -266,8 +311,9 @@ def capture_all_violations_individually(
         
         if screenshot_result:
             violation_id = violation.get("id", "unknown")
-            screenshot_paths[violation_id] = str(screenshot_result.screenshot_path)
-            # Update the violation dict in-place
-            violation["screenshot_path"] = str(screenshot_result.screenshot_path)
+            screenshot_path_str = str(screenshot_result.screenshot_path)
+            screenshot_paths[violation_id] = screenshot_path_str
+            # Update violation dict in-place with screenshot path
+            violation["screenshot_path"] = screenshot_path_str
     
     return screenshot_paths
