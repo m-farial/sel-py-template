@@ -10,14 +10,15 @@ readme = "README.md"
 authors = ["Farial Mahbub <mahbub.farial@gmail.com>"]
 license = "MIT"
 keywords = ["selenium", "testing", "python", "automation"]
+packages = [
+  { include = "pytest_axe_a11y", from = "src" }
+]
 
 [tool.poetry.dependencies]
 python = "^3.10"
 selenium = "^4.0"
 webdriver-manager = "^4.0.2"
-
-[[tool.poetry.packages]]
-include = "sel_py_template"
+axe-selenium-python = "^2.1.6"
 
 [tool.ruff]
 line-length = 88
@@ -108,6 +109,8 @@ for p in Path('.').rglob('__pycache__'):
 minversion = "7.0"
 addopts = "-q "
 report_title = "Selenium Python Template Test Report"
+pythonpath = ["src"]
+markers = ["a11y: mark test to run accessibility checks"]
 
 [tool.mypy]
 python_version = "3.10"
