@@ -9,7 +9,7 @@ from __future__ import annotations
 from axe_selenium_python import Axe
 from selenium.webdriver.remote.webdriver import WebDriver
 
-from src.pytest_a11y.types import AxeResults, AxeRunnerProtocol, ProcessedResults
+from src.pytest_axe_a11y.types import AxeResults, AxeRunnerProtocol, ProcessedResults
 
 
 class AxeRunner:

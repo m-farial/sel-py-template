@@ -3,8 +3,8 @@ from __future__ import annotations
 import pytest
 from selenium.webdriver.remote.webdriver import WebDriver
 
-from pytest_a11y.axe.runner import AxeRunner
-from src.pytest_a11y.types import AxeRunnerProtocol
+from pytest_axe_a11y.axe.runner import AxeRunner
+from src.pytest_axe_a11y.types import AxeRunnerProtocol
 
 
 @pytest.fixture

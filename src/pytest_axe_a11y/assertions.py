@@ -9,7 +9,7 @@ from __future__ import annotations
 from html import escape
 from typing import Literal
 
-from src.pytest_a11y.types import (
+from src.pytest_axe_a11y.types import (
     AxeResults,
     AxeViolation,
     AxeNode,

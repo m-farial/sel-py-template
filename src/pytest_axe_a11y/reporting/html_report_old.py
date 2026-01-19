@@ -8,7 +8,7 @@
 # from pathlib import Path
 # from typing import Any
 
-# from pytest_a11y.assertions import format_violation, categorize_violations,
+# from pytest_axe_a11y.assertions import format_violation, categorize_violations,
 
 # from src.utils.logger_util import LoggerFactory
 

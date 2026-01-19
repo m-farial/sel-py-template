@@ -1,8 +1,8 @@
 """
 Pytest plugin for accessibility testing with axe-core.
 
-Provides the check_a11y fixture which runs accessibility checks,
-generates reports, captures screenshots, and asserts on violations.
+Provides CLI options, fixtures, and report generation for accessibility checks.
+Integrates with pytest configuration and supports easy a11y directory customization.
 """
 from __future__ import annotations
 
@@ -14,39 +14,88 @@ from pathlib import Path
 import pytest
 from selenium.webdriver.remote.webdriver import WebDriver
 
-from src.pytest_a11y.assertions import assert_no_axe_violations
-from src.pytest_a11y.reporting.html_report import generate_a11y_report
-from src.pytest_a11y.reporting.json_report import write_a11y_json_report
-from src.pytest_a11y.types import A11YRunResults, AxeResults, AxeRunnerProtocol
-from src.pytest_a11y.visual.axe_overlay import capture_all_violations_individually
-from src.utils.logger_util import LoggerFactory
-
-logger = LoggerFactory.get_logger(__name__)
+from src.pytest_axe_a11y.assertions import assert_no_axe_violations
+from src.pytest_axe_a11y.reporting.html_report import generate_a11y_report
+from src.pytest_axe_a11y.reporting.json_report import write_a11y_json_report
+from src.pytest_axe_a11y.types import A11YRunResults, AxeResults, AxeRunnerProtocol
+from src.pytest_axe_a11y.visual.axe_overlay import capture_all_violations_individually
 
 
 # ============================================================================
-# Pytest hooks
+# Pytest hooks and configuration
 # ============================================================================
 
 def pytest_addoption(parser: pytest.Parser) -> None:
     """
     Register CLI options for the a11y plugin.
     
-    Adds --a11y flag to enable accessibility testing.
+    Adds the following options:
+        --a11y: Enable accessibility checks
+        --a11y-dir: Directory to save reports (default: .a11y)
+    
+    Can also be configured via:
+        - pytest.ini: [pytest] a11y_reports = /path/to/reports
+        - conftest.py: config.option.a11y_reports = Path("/path/to/reports")
     
     Args:
         parser: pytest argument parser
     """
-    parser.addoption(
+    group = parser.getgroup("a11y", "Accessibility testing options")
+    
+    group.addoption(
         "--a11y",
         action="store_true",
         default=False,
         help="Run axe-core accessibility checks (and generate reports).",
     )
+    
+    group.addoption(
+        "--a11y-dir",
+        type=str,
+        default=".a11y",
+        help="Directory to save a11y reports (default: .a11y)",
+    )
+    
+    # Add INI file option for pytest.ini configuration
+    parser.addini(
+        "a11y_reports",
+        type="string",
+        default=".a11y",
+        help="Directory to save a11y reports (can also use --a11y-dir CLI option)",
+    )
+
+
+def pytest_configure(config: pytest.Config) -> None:
+    """
+    Configure pytest with a11y plugin settings.
+    
+    Called after command line options are parsed.
+    Sets up the a11y directory if accessibility testing is enabled.
+    
+    Configuration priority (highest to lowest):
+        1. conftest.py: config.option.a11y_reports = Path(...)
+        2. CLI: --a11y-dir /path/to/reports
+        3. pytest.ini: a11y_reports = /path/to/reports
+        4. Environment: A11Y_DIR=/path/to/reports
+        5. Default: .a11y
+    
+    Args:
+        config: pytest configuration object
+    """
+    # Store a11y settings in config for access in fixtures
+    config.a11y_enabled = config.getoption("--a11y")  # type: ignore[attr-defined]
+    
+    # Resolve a11y directory with priority order
+    a11y_dir = _resolve_a11y_dir(config)
+    config.a11y_dir = a11y_dir  # type: ignore[attr-defined]
+    
+    # Create directory if it doesn't exist
+    if config.a11y_enabled:  # type: ignore[attr-defined]
+        config.a11y_dir.mkdir(parents=True, exist_ok=True)  # type: ignore[attr-defined]
 
 
 # ============================================================================
-# Utilities
+# Utility functions
 # ============================================================================
 
 def _safe_slug(text: str, max_len: int = 10) -> str:
@@ -93,6 +142,46 @@ def _nodeid_hash(nodeid: str, length: int = 10) -> str:
     ).hexdigest()[:length]
 
 
+def _resolve_a11y_dir(config: pytest.Config) -> Path:
+    """
+    Resolve a11y reports directory from all configuration sources.
+    
+    Checks multiple configuration sources in priority order:
+        1. conftest.py: config.option.a11y_reports (if set programmatically)
+        2. CLI: --a11y-dir /path/to/reports
+        3. pytest.ini: a11y_reports = /path/to/reports
+        4. Environment: A11Y_DIR=/path/to/reports
+        5. Default: .a11y
+    
+    Args:
+        config: pytest configuration object
+    
+    Returns:
+        Resolved Path object for the a11y reports directory
+    """
+    # Priority 1: Check if config.option.a11y_reports was set programmatically
+    if hasattr(config.option, "a11y_reports") and config.option.a11y_reports:  # type: ignore[attr-defined]
+        return Path(config.option.a11y_reports)  # type: ignore[attr-defined]
+    
+    # Priority 2: Check CLI --a11y-dir (only if not default)
+    cli_dir = config.getoption("--a11y-dir")  # type: ignore[union-attr]
+    if cli_dir and cli_dir != ".a11y":  # type: ignore[comparison-overlap]
+        return Path(cli_dir)
+    
+    # Priority 3: Check pytest.ini a11y_reports setting
+    ini_dir = config.getini("a11y_reports")  # type: ignore[union-attr]
+    if ini_dir and ini_dir != ".a11y":  # type: ignore[comparison-overlap]
+        return Path(ini_dir)
+    
+    # Priority 4: Check environment variable
+    env_dir = os.environ.get("A11Y_DIR")
+    if env_dir:
+        return Path(env_dir)
+    
+    # Priority 5: Return default
+    return Path(".a11y_reports")
+
+
 # ============================================================================
 # Fixtures
 # ============================================================================
@@ -109,6 +198,11 @@ def check_a11y(
     This fixture provides a callable that executes a11y checks and generates
     HTML/JSON reports and individual violation screenshots. Reports are only
     generated when --a11y CLI flag is provided.
+    
+    Configuration:
+        - Use --a11y flag to enable checks
+        - Use --a11y-dir <path> to specify report directory (default: .a11y)
+        - Or set A11Y_DIR environment variable
     
     Behavior:
         - Without --a11y: fixture skips when invoked
@@ -132,19 +226,22 @@ def check_a11y(
     Raises:
         pytest.skip: When --a11y flag not provided
         AssertionError: When violations found (if assertions enabled)
+        
+    Example:
+        >>> def test_homepage_a11y(check_a11y):
+        ...     results = check_a11y()
+        ...     # Reports auto-generated in .a11y directory
     """
-    enabled: bool = bool(request.config.getoption("--a11y"))
+    # Check if a11y testing is enabled
+    enabled: bool = bool(request.config.getoption("--a11y"))  # type: ignore[union-attr]
     if not enabled:
         def _skipped() -> A11YRunResults:
             pytest.skip("Accessibility checks not enabled (use --a11y)")
             raise RuntimeError("unreachable")  # for type checkers
         return _skipped
 
-    # Resolve a11y report directory
-    try:
-        a11y_dir = LoggerFactory.get_a11y_dir()
-    except Exception:
-        a11y_dir = os.getcwd()
+    # Resolve output directory (uses config settings from pytest_configure)
+    a11y_dir = request.config.a11y_dir  # type: ignore[attr-defined]
 
     # Generate xdist-safe filenames
     worker_id = os.environ.get("PYTEST_XDIST_WORKER", "master")
@@ -153,9 +250,9 @@ def check_a11y(
     h = _nodeid_hash(nodeid)
 
     base = f"{name}__{worker_id}__{h}"
-    html_path = os.path.join(a11y_dir, f"{base}.html")
-    json_path = os.path.join(a11y_dir, f"{base}.json")
-    screenshot_dir = os.path.join(a11y_dir, "violation_screenshots")
+    html_path = a11y_dir / f"{base}.html"
+    json_path = a11y_dir / f"{base}.json"
+    screenshot_dir = a11y_dir / "violation_screenshots"
 
     def _run() -> A11YRunResults:
         """
@@ -187,6 +284,7 @@ def check_a11y(
             axe_results=axe_results,
             page_url=driver.current_url,
             output_path=html_path,
+            screenshot_dir=screenshot_dir,
         )
         write_a11y_json_report(
             axe_results=axe_results,
@@ -200,9 +298,9 @@ def check_a11y(
 
         return {
             "axe": axe_results,
-            "html_report": html_path,
-            "json_report": json_path,
-            "screenshot_dir": screenshot_dir,
+            "html_report": str(html_path),
+            "json_report": str(json_path),
+            "screenshot_dir": str(screenshot_dir),
         }
 
     return _run

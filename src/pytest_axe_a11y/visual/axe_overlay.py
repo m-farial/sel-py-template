@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Iterable, Mapping, Any
 from selenium.webdriver.remote.webdriver import WebDriver
 
-from src.pytest_a11y.types import AxeViolation, AxeResults
+from src.pytest_axe_a11y.types import AxeViolation, AxeResults
 
 
 # ============================================================================

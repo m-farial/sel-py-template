@@ -5,7 +5,7 @@
 
 # from selenium.webdriver.remote.webdriver import WebDriver
 
-# from pytest_a11y.types import AxeResults
+# from pytest_axe_a11y.types import AxeResults
 
 # _MARK_JS = """
 # const selector = arguments[0];

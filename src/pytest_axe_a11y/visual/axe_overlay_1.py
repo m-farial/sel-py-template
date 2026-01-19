@@ -6,7 +6,7 @@ from typing import Any, Literal
 
 from selenium.webdriver.remote.webdriver import WebDriver
 
-from pytest_a11y.types import AxeResults
+from pytest_axe_a11y.types import AxeResults
 
 Severity = Literal["critical", "serious", "moderate", "minor", "unknown"]
 

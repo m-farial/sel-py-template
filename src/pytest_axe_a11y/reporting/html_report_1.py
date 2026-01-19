@@ -4,10 +4,10 @@
 # from pathlib import Path
 # from typing import Any
 
-# from pytest_a11y.assertions import (
+# from pytest_axe_a11y.assertions import (
 #     extract_violation_details,
 # )
-# from pytest_a11y.reporting.report_generator import A11yViolationsReport
+# from pytest_axe_a11y.reporting.report_generator import A11yViolationsReport
 # from src.utils.logger_util import LoggerFactory
 
 # logger = LoggerFactory.get_logger(__name__)

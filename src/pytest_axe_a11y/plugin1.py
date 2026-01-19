@@ -7,12 +7,12 @@
 # import pytest
 # from selenium.webdriver.remote.webdriver import WebDriver
 
-# from src.pytest_a11y.assertions import assert_no_axe_violations
-# from src.pytest_a11y.reporting.html_report import generate_a11y_report
-# from src.pytest_a11y.reporting.json_report import write_a11y_json_report
-# from src.pytest_a11y.screenshots import save_screenshot
-# from src.pytest_a11y.types import A11YRunResults, AxeResults, AxeRunnerProtocol
-# from src.pytest_a11y.visual.axe_overlay import highlight_axe_violations
+# from src.pytest_axe_a11y.assertions import assert_no_axe_violations
+# from src.pytest_axe_a11y.reporting.html_report import generate_a11y_report
+# from src.pytest_axe_a11y.reporting.json_report import write_a11y_json_report
+# from src.pytest_axe_a11y.screenshots import save_screenshot
+# from src.pytest_axe_a11y.types import A11YRunResults, AxeResults, AxeRunnerProtocol
+# from src.pytest_axe_a11y.visual.axe_overlay import highlight_axe_violations
 # from src.utils.logger_util import LoggerFactory
 
 # logger = LoggerFactory.get_logger(__name__)
