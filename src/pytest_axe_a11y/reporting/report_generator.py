@@ -409,9 +409,16 @@ class A11yViolationsReport:
             align-items: center;
             justify-content: space-between;
             transition: background-color 0.2s;
-            border-left: 4px solid #dc3545;
+            border-left: 4px solid transparent;
             background: #f9f9f9;
         }
+
+        /* Severity-specific styling */
+        .violation-header.impact-critical { border-left-color: #dc3545; } /* red */
+        .violation-header.impact-serious  { border-left-color: #fd7e14; } /* orange */
+        .violation-header.impact-moderate { border-left-color: #ffc107; } /* amber */
+        .violation-header.impact-minor    { border-left-color: #0d6efd; } /* blue */
+        .violation-header.impact-unknown  { border-left-color: #6c757d; } /* gray */
 
         .violation-header:hover {
             background: #f0f0f0;
@@ -734,6 +741,7 @@ class A11yViolationsReport:
                 const violationElement = document.createElement('div');
                 violationElement.className = 'violation-card';
                 const hasScreenshot = violation.screenshot && violation.screenshot.trim() !== '';
+                const impactClass = `impact-${violation.summary.match(/\[(.*?)\]/)?.[1]?.toLowerCase() || 'unknown'}`;
 
                 const nodesHtml = violation.nodes.map((node, nodeIdx) => `
                     <div class="node-item">
@@ -750,7 +758,7 @@ class A11yViolationsReport:
                 `).join('');
 
                 violationElement.innerHTML = `
-                    <div class="violation-header" onclick="toggleViolationDetails(this)">
+                    <div class="violation-header ${impactClass}" onclick="toggleViolationDetails(this)">
                         <div class="violation-info">
                             <div class="violation-name">
                                 <span class="toggle"></span>
