@@ -151,7 +151,7 @@ detect-secrets = "^1.5.0"
 poethepoet = "^0.38.0"
 pytest-xdist = "^3.8.0"
 pytest-html-plus = "^0.4.7"
-dulwich = "^0.25.1"
+dulwich = "^1.0.0"
 
 [tool.poetry.scripts]
 fmt-lint = "scripts.fmt_lint:main"
