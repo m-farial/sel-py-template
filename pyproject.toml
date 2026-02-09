@@ -14,7 +14,7 @@ keywords = ["selenium", "testing", "python", "automation"]
 [tool.poetry.dependencies]
 python = "^3.10"
 selenium = "^4.39"
-webdriver-manager = "^4.0.2"
+webdriver-manager = "==4.0.2"
 
 [[tool.poetry.packages]]
 include = "sel_py_template"
@@ -135,23 +135,19 @@ ignore_missing_imports = true
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^9.0.2"
-black = "^25.11.0"
+black = "^26.1.0"
 isort = "^7.0.0"
 ruff = "*"
 pre-commit = "^4.4.0"
-autoflake = "^2.3.1"
 mypy = "^1.18.2"
-flake8 = "^7.3.0"
-flake8-bugbear = "^25.10.21"
-flake8-comprehensions = "^3.17.0"
-pydocstyle = "^6.3.0"
-flake8-builtins = "^3.1.0"
 safety = "^3.7.0"
 detect-secrets = "^1.5.0"
 poethepoet = "^0.38.0"
 pytest-xdist = "^3.8.0"
 pytest-html-plus = "^0.4.7"
 dulwich = "^0.25.1"
+urllib3 = "^2.6.3"
+authlib = "^1.6.6"
 
 [tool.poetry.scripts]
 fmt-lint = "scripts.fmt_lint:main"
