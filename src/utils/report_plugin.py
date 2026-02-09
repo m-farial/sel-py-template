@@ -1,13 +1,13 @@
+from collections.abc import Generator
+from datetime import datetime
 import json
 import logging
 import logging.config
 import os
-from collections.abc import Generator
-from datetime import datetime
 from typing import Any
 
-import pytest
 from dulwich.repo import Repo
+import pytest
 from pytest_html_plus.utils import get_python_version
 
 
