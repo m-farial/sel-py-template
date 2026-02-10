@@ -76,7 +76,7 @@ jobs:
           retention-days: 3
 
   full-tests:
-    if: github.event_name == 'schedule' || github.ref == 'refs/heads/main'
+    if: github.event_name == 'pull_request' || github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     name: Full Tests - ${{ matrix.browser }}
     timeout-minutes: 20
@@ -109,15 +109,14 @@ jobs:
             ${{ runner.os }}-poetry-
 
       - name: Install dependencies with Poetry
-        run: poetry install
+        run: poetry install --no-root
 
       - name: Run tests - ${{ matrix.browser }}
         run: |
           poetry run pytest tests/ \
             --browser=${{ matrix.browser }} \
             --headless \
-            --html=logs/report_${{ matrix.browser }}.html \
-            --self-contained-html \
+            --html-output=logs/report_${{ matrix.browser }}.html \
             -v
         env:
           CI: true
