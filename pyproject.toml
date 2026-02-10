@@ -4,7 +4,7 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.poetry]
 name = "sel-py-template"
-version = "0.0.0"
+version = "1.0.0"
 description = "Selenium Python Template."
 readme = "README.md"
 authors = ["Farial Mahbub <mahbub.farial@gmail.com>"]
@@ -22,26 +22,28 @@ include = "sel_py_template"
 [tool.ruff]
 line-length = 88
 target-version = "py310"
-# Allow Ruff to fix issues automatically
-fix = true
+src = ["src", "tests"]
 
 [tool.ruff.lint]
 select = [
-    "E",   # pycodestyle errors
-    "F",   # Pyflakes
-    "W",   # pycodestyle warnings
-    "I",   # import sorting
-    "UP",  # modernize Python 3 syntax
-    "N",   # naming conventions
-    "S",   # security checks
-    "B",   # bugbear (dangerous code patterns)
-    "A",   # builtins shadowing
-    "RUF", # Ruff-specific rules
+    "E", "F", "W",
+    "I",
+    "UP",
+    "N",
+    "S",
+    "B",
+    "A",
+    "RUF",
+    "T",   # print() + debugger/breakpoints
 ]
 ignore = [
-    "E501",  # line length (Black handles this)
-    "S101",  # allow asserts in tests
+    "E501",
+    "S101",
 ]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101"]
+"scripts/**" = ["T"]
 
 [tool.ruff.format]
 quote-style = "double"
@@ -52,76 +54,31 @@ line-ending = "auto"
 combine-as-imports = true
 force-sort-within-sections = true
 
-[tool.ruff.lint.per-file-ignores]
-# ignore print statements in scripts and test files
-"tests/*" = ["S101", "T201"]
-"scripts/*" = ["T201", "S603"]
-
-[tool.black]
-line-length = 88
-target-version = ["py310"]
-include = '\.pyi?$'
-force-exclude = '\.venv'
-
-[tool.isort]
-profile = "black"
-line_length = 88
-
 # Poe the Poet tasks
 [tool.poe.tasks]
-# Format all code
-fmt = [
-    {cmd = "black ."},
-    {cmd = "ruff check . --fix"},
-]
+fmt = "ruff format ."
+lint = "ruff check . --fix"
+lint-check = "ruff check ."
+typecheck = "mypy src"
 
-# Check formatting without changing files
-lint = [
-    {cmd = "black --check ."},
-    {cmd = "ruff check ."},
-]
+check = ["fmt", "lint", "typecheck"]
 
-# Format then lint
-fmt-lint = ["fmt", "lint"]
-
-# Run tests
-test = "pytest"
-
-# Clean cache directories
-[tool.poe.tasks.clean]
-shell = """
-python -c "
-import shutil
-from pathlib import Path
-
-dirs = ['.pytest_cache', '.ruff_cache', '.mypy_cache']
-for d in dirs:
-    if Path(d).exists():
-        shutil.rmtree(d)
-        
-for p in Path('.').rglob('__pycache__'):
-    shutil.rmtree(p, ignore_errors=True)
-"
-"""
 
 [tool.pytest.ini_options]
 minversion = "7.0"
 addopts = "-q "
 report_title = "Selenium Python Template Test Report"
+pythonpath = ["src"]
+markers = ["a11y: mark test to run accessibility checks"]
 
 [tool.mypy]
 python_version = "3.10"
-files = ["src", "tests"]
-warn_unused_configs = true
-warn_redundant_casts = true
+mypy_path = "src"
+strict = true
 warn_unused_ignores = true
-warn_return_any = true
-disallow_untyped_defs = true
-disallow_incomplete_defs = true
-check_untyped_defs = true
+warn_redundant_casts = true
 no_implicit_optional = true
-strict_optional = true
-allow_redefinition = true
+disallow_any_generics = true
 show_error_codes = true
 pretty = true
 
@@ -129,7 +86,7 @@ pretty = true
 [[tool.mypy.overrides]]
 module = [
     "selenium.*",
-    "pytest_html.*",
+    "pytest_html_plus.*",
 ]
 ignore_missing_imports = true
 

@@ -2,7 +2,7 @@
 
 import os
 import time
-from typing import overload
+from typing import Any, overload
 
 from selenium.common.exceptions import (
     ElementClickInterceptedException,
@@ -13,12 +13,13 @@ from selenium.common.exceptions import (
     WebDriverException,
 )
 from selenium.webdriver.common.action_chains import ActionChains
+from selenium.webdriver.remote.alert import Alert
 from selenium.webdriver.remote.webdriver import WebDriver
 from selenium.webdriver.remote.webelement import WebElement
 from selenium.webdriver.support import expected_conditions as ec
 from selenium.webdriver.support.ui import WebDriverWait
 
-from src.utils.logger_util import LoggerFactory
+from utils.logger_util import LoggerFactory
 
 Locator = tuple[str, str]
 
@@ -52,7 +53,7 @@ class BasePage:
         """
         self.driver: WebDriver = driver
         self.timeout: int = timeout
-        self.wait: WebDriverWait = WebDriverWait(self.driver, self.timeout)
+        self.wait: WebDriverWait[WebDriver] = WebDriverWait(self.driver, self.timeout)
         # Create browser-specific logger
         self.logger = LoggerFactory.get_logger(self.__class__.__name__, browser=browser)
         self.logger.debug(
@@ -110,12 +111,14 @@ class BasePage:
             >>> same_element = page.wait_until_clickable(el, timeout=5)
         """
         try:
+            # Create a typed wait once to avoid redeclaration issues
+            wait: WebDriverWait[WebDriver] = WebDriverWait(self.driver, timeout)
+
             # Handle Locator tuple
             if isinstance(target, tuple) and len(target) == 2:
                 self.logger.debug(
                     f"Waiting for element {target} to be clickable (timeout={timeout}s)"
                 )
-                wait = WebDriverWait(self.driver, timeout)
                 element = wait.until(ec.element_to_be_clickable(target))
                 self.logger.debug(f"Element {target} is now clickable")
                 return element
@@ -125,7 +128,6 @@ class BasePage:
                 self.logger.debug(
                     f"Waiting for WebElement to be clickable (timeout={timeout}s)"
                 )
-                wait = WebDriverWait(self.driver, timeout)
                 wait.until(lambda d: target.is_displayed() and target.is_enabled())
                 self.logger.debug("WebElement is now clickable")
                 return target
@@ -159,7 +161,7 @@ class BasePage:
             raise ElementNotFoundError(msg) from e
 
     def wait_for_element_to_disappear(
-        self, locator: tuple, timeout: int | None = None
+        self, locator: Locator, timeout: int | None = None
     ) -> bool:
         """
         Wait for an element to disappear.
@@ -176,7 +178,7 @@ class BasePage:
                 f"Waiting for element to disappear: {locator} (timeout={timeout})"
             )
             wait_time = timeout if timeout is not None else self.timeout
-            wait = WebDriverWait(self.driver, wait_time)
+            wait: WebDriverWait[WebDriver] = WebDriverWait(self.driver, wait_time)
             wait.until(ec.invisibility_of_element_located(locator))
             return True
         except TimeoutException:
@@ -306,7 +308,7 @@ class BasePage:
                 self.logger.debug(
                     f"Clicking WebElement with offset ({x_offset}, {y_offset})"
                 )
-                el = self.wait_until_clickable_element(target, timeout=timeout)
+                el = self.wait_until_clickable(target, timeout=timeout)
             elif isinstance(target, tuple):
                 self.logger.debug(
                     f"Clicking {target} with offset ({x_offset}, {y_offset})"
@@ -347,7 +349,7 @@ class BasePage:
         try:
             if isinstance(target, WebElement):
                 self.logger.debug("Double-clicking WebElement")
-                el = self.wait_until_clickable_element(target, timeout=timeout)
+                el = self.wait_until_clickable(target, timeout=timeout)
             elif isinstance(target, tuple):
                 self.logger.debug(f"Double-clicking element: {target}")
                 el = self.wait_until_clickable(target, timeout=timeout)
@@ -385,7 +387,7 @@ class BasePage:
         try:
             if isinstance(target, WebElement):
                 self.logger.debug("Right-clicking WebElement")
-                el = self.wait_until_clickable_element(target, timeout=timeout)
+                el = self.wait_until_clickable(target, timeout=timeout)
             elif isinstance(target, tuple):
                 self.logger.debug(f"Right-clicking element: {target}")
                 el = self.wait_until_clickable(target, timeout=timeout)
@@ -425,7 +427,7 @@ class BasePage:
         try:
             if isinstance(target, WebElement):
                 self.logger.debug(f"Click and hold WebElement for {duration}s")
-                el = self.wait_until_clickable_element(target, timeout=timeout)
+                el = self.wait_until_clickable(target, timeout=timeout)
             elif isinstance(target, tuple):
                 self.logger.debug(f"Click and hold {target} for {duration}s")
                 el = self.wait_until_clickable(target, timeout=timeout)
@@ -511,7 +513,7 @@ class BasePage:
             return []
 
     def send_keys(
-        self, locator: tuple, text: str, timeout: int = 10, clear_first: bool = True
+        self, locator: Locator, text: str, timeout: int = 10, clear_first: bool = True
     ) -> None:
         """
         Send keys to an input element.
@@ -536,7 +538,7 @@ class BasePage:
             self.logger.error(msg)
             raise ElementInteractionError(msg) from e
 
-    def get_text(self, locator: tuple) -> str:
+    def get_text(self, locator: Locator) -> str:
         """
         Get text from an element.
 
@@ -552,7 +554,7 @@ class BasePage:
         self.logger.debug(f"Got text from {locator}: {text}")
         return text
 
-    def is_displayed(self, locator: tuple, timeout: int | None = 5) -> bool:
+    def is_displayed(self, locator: Locator, timeout: int | None = 5) -> bool:
         """
         Check if element is displayed.
 
@@ -576,7 +578,7 @@ class BasePage:
             self.logger.error(f"Error checking visibility for {locator}: {e}")
             return False
 
-    def get_attribute(self, locator: tuple, attribute: str) -> str:
+    def get_attribute(self, locator: Locator, attribute: str) -> str | None:
         """
         Get attribute value from an element.
 
@@ -585,7 +587,7 @@ class BasePage:
             attribute: Attribute name
 
         Returns:
-            Attribute value
+            Attribute value (may be None)
         """
         element = self.find(locator)
         value = element.get_attribute(attribute)
@@ -626,7 +628,7 @@ class BasePage:
         self.driver.execute_script("arguments[0].scrollIntoView(true);", element)
         self.logger.debug(f"Scrolled to element: {locator}")
 
-    def execute_script(self, script: str, *args) -> any:
+    def execute_script(self, script: str, *args: Any) -> Any:
         """
         Execute JavaScript on the page.
 
@@ -639,7 +641,7 @@ class BasePage:
         """
         return self.driver.execute_script(script, *args)
 
-    def switch_to_frame(self, frame_reference) -> None:
+    def switch_to_frame(self, frame_reference: int | str | WebElement) -> None:
         """
         Switch to an iframe.
 
@@ -672,7 +674,7 @@ class BasePage:
         self.logger.info(f"Screenshot saved: {screenshot_path}")
         return screenshot_path
 
-    def get_alert(self, timeout: int = 5):
+    def get_alert(self, timeout: int = 5) -> Alert | None:
         """Return the alert object if present within timeout, else None."""
         try:
             return WebDriverWait(self.driver, timeout).until(ec.alert_is_present())
@@ -694,7 +696,7 @@ class BasePage:
         """Accept alert if present and return its text, else None."""
         alert = self.get_alert(timeout)
         if alert:
-            text = alert.text
+            text = str(alert.text)
             alert.accept()
             self.logger.info("Accepted alert: %s", text)
             return text

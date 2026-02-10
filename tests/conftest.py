@@ -21,9 +21,16 @@ date_str = datetime.now().strftime("%m-%d-%Y")
 LOG_PATH = os.path.join(os.getcwd(), "logs", date_str)
 # Configure pytest-html report location
 REPORT_DIR = os.path.join(LOG_PATH, "reports")
+A11Y_DIR = os.path.join(LOG_PATH, "a11y_reports")
 LoggerFactory.set_log_dir(LOG_PATH)
 LoggerFactory.set_report_dir(REPORT_DIR)
+LoggerFactory.set_a11y_dir(A11Y_DIR)
 logger = logging.getLogger(__name__)
+
+pytest_plugins = [
+    "pytest_axe_a11y.plugin",
+    "pytest_axe_a11y.axe.fixtures",
+]
 
 
 def add_stream_handler(
@@ -52,6 +59,7 @@ def pytest_configure(config):
     """Register ReportPlugin only after pytest-html is available."""
     os.makedirs(LOG_PATH, exist_ok=True)
     os.makedirs(REPORT_DIR, exist_ok=True)
+    os.makedirs(A11Y_DIR, exist_ok=True)
     # Determine browser for plugin registration
     browser: str = config.getoption("--browser") or "generic"
     if config.getoption("--all-browsers"):
@@ -182,7 +190,8 @@ def driver(
         if headless:
             chrome_options.add_argument("--headless")
             chrome_options.add_argument("--disable-gpu")
-            chrome_options.add_argument("--window-size=1920,1080")
+            chrome_options.add_argument("--window-size=1400,900")
+
         chrome_options.add_argument("--no-sandbox")
         chrome_options.add_argument("--disable-dev-shm-usage")
         chrome_options.set_capability("goog:loggingPrefs", {"browser": "ALL"})
@@ -194,8 +203,8 @@ def driver(
         firefox_options: FirefoxOptions = FirefoxOptions()
         if headless:
             firefox_options.add_argument("--headless")
-        firefox_options.add_argument("--width=1920")
-        firefox_options.add_argument("--height=1080")
+        firefox_options.add_argument("--width=1400")
+        firefox_options.add_argument("--height=900")
         driver_instance = webdriver.Firefox(
             service=FirefoxService(), options=firefox_options
         )
@@ -205,6 +214,7 @@ def driver(
         if headless:
             edge_options.add_argument("--headless=new")
             edge_options.add_argument("--disable-gpu")
+            edge_options.add_argument("--window-size=1400,900")
         edge_options.add_argument("--start-maximized")
         driver_instance = webdriver.Edge(service=EdgeService(), options=edge_options)
 

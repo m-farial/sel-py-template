@@ -1,3 +1,4 @@
+from collections.abc import Generator
 from datetime import datetime
 import json
 import logging
@@ -41,17 +42,26 @@ class ReportPlugin:
         git_info = {"branch": "NA", "commit": "NA"}
         try:
             repo = Repo(".")
-            head = repo.refs.read_ref(b"HEAD")
-            branch = head.decode().replace("refs/heads/", "").replace("ref: ", "")
-            # Get current commit
-            commit_sha = repo[b"HEAD"].id
-            commit = commit_sha.decode()[:7]
+            # read_ref API is typed to use Ref objects; dulwich may return bytes at runtime
+            head = repo.refs.read_ref(b"HEAD")  # type: ignore[arg-type]
+            branch = (
+                (head.decode() if isinstance(head, (bytes, bytearray)) else str(head))
+                .replace("refs/heads/", "")
+                .replace("ref: ", "")
+            )
+            # Get current commit; index access is untyped for the Repo mapping
+            commit_obj = repo[b"HEAD"]
+            commit_sha = getattr(commit_obj, "id", None)
+            if isinstance(commit_sha, (bytes, bytearray)):
+                commit = commit_sha.decode()[:7]
+            else:
+                commit = None
             git_info["commit"] = commit if commit else "NA"
             git_info["branch"] = branch if branch else "NA"
 
-        except ImportError:
+        except Exception:
             self.session_logger.warning(
-                "Dulwich not installed; cannot retrieve git information."
+                "Dulwich not available or repository not found; cannot retrieve git information."
             )
         return git_info
 
@@ -72,8 +82,10 @@ class ReportPlugin:
             "browser": self.browser,
         }
 
-    def set_config_metadata(self, config: pytest.Config) -> None:
+    def set_config_metadata(self, config: pytest.Config | None) -> None:
         """Set metadata for pytest-html-plus reports."""
+        if config is None:
+            return
         env = self._get_environment_info()
         # Precedence: cli_title > env_title > default
         cli_title = config.getoption("report_title", None)
@@ -92,7 +104,7 @@ class ReportPlugin:
         config.option.browser = env.get("browser", "NA")
         config.option.generated_at = env.get("generated_at", "NA")
 
-    def configure_logging(self):
+    def configure_logging(self) -> None:
         logging_config = {
             "version": 1,
             "disable_existing_loggers": False,
@@ -129,15 +141,16 @@ class ReportPlugin:
         }
 
         logging.config.dictConfig(logging_config)
-        print(f"\n Logs will be stored in: {self.log_file}")
 
     @pytest.fixture(scope="session")
     def logger(self, request: pytest.FixtureRequest) -> logging.Logger:
         return request.config._logger  # type: ignore
 
     @pytest.hookimpl(hookwrapper=True, tryfirst=True)
-    def pytest_runtest_makereport(self, item: pytest.Item, call: pytest.CallInfo):
-        outcome = yield
+    def pytest_runtest_makereport(
+        self, item: pytest.Item, call: pytest.CallInfo[None]
+    ) -> Generator[None, None, None]:
+        outcome: Any = yield
         report = outcome.get_result()
         timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
         if report.when in ("call", "setup"):
@@ -197,7 +210,7 @@ class ReportPlugin:
                 self.session_logger.info(f"xx Passed Test {report.nodeid}")
 
     @pytest.hookimpl(tryfirst=True)
-    def pytest_sessionstart(self, session: pytest.Session):
+    def pytest_sessionstart(self, session: pytest.Session) -> None:
         """Write pytest-html-plus compatible plus_metadata.json into the report folder early.
 
         This ensures the HTML generator can pick up git/branch info even when pytest-html-plus
@@ -234,7 +247,7 @@ class ReportPlugin:
 
     # Hook: session summary
     @pytest.hookimpl(tryfirst=True)
-    def pytest_sessionfinish(self, session, exitstatus):
+    def pytest_sessionfinish(self, session: pytest.Session, exitstatus: int) -> None:
         self.session_logger.info(">> Test session finished")
         total = len(self.test_reports)
         passed = sum(1 for t in self.test_reports if t["outcome"] == "passed")

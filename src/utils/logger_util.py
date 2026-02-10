@@ -9,6 +9,7 @@ class LoggerFactory:
     _current_browser: str | None = None
     _log_dir: str | None = None
     _report_dir: str | None = None
+    _a11y_dir: str | None = None
 
     @classmethod
     def set_browser(cls, browser: str) -> None:
@@ -30,6 +31,14 @@ class LoggerFactory:
     @classmethod
     def get_report_dir(cls) -> str | None:
         return cls._report_dir
+
+    @classmethod
+    def set_a11y_dir(cls, path: str | Path) -> None:
+        cls._a11y_dir = str(Path(path))
+
+    @classmethod
+    def get_a11y_dir(cls) -> str | None:
+        return cls._a11y_dir
 
     @classmethod
     def get_logger(cls, name: str, browser: str | None = None) -> logging.Logger:

@@ -90,3 +90,4 @@ selenium-manager/
 # Project specific
 config/secrets.json
 *.local.json
+development/*

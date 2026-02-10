@@ -40,9 +40,9 @@ class TestBrowserSetup:
 
         driver.get(test_url)
 
-        assert driver.current_url.startswith(
-            "https://www.google"
-        ), f"Expected Google URL, got {driver.current_url}"
+        assert driver.current_url.startswith("https://www.google"), (
+            f"Expected Google URL, got {driver.current_url}"
+        )
         logger.info("✓ Successfully navigated to URL")
 
     def test_page_title(self, driver: WebDriver, logger) -> None:
@@ -101,9 +101,9 @@ class TestBrowserSetup:
 
         # Verify text was entered
         entered_text = search_box.get_attribute("value")
-        assert (
-            entered_text == test_text
-        ), f"Expected '{test_text}', got '{entered_text}'"
+        assert entered_text == test_text, (
+            f"Expected '{test_text}', got '{entered_text}'"
+        )
         logger.info("✓ Successfully interacted with element")
 
     def test_javascript_execution(self, driver: WebDriver, logger) -> None:
@@ -191,9 +191,9 @@ def test_saucedemo_navigation(driver: WebDriver, logger) -> None:
     driver.get(url)
 
     # Verify page loaded
-    assert (
-        "Swag Labs" in driver.title
-    ), f"Expected 'Swag Labs' in title, got '{driver.title}'"
+    assert "Swag Labs" in driver.title, (
+        f"Expected 'Swag Labs' in title, got '{driver.title}'"
+    )
 
     # Verify login elements exist
     username_field = driver.find_element(By.ID, "user-name")

@@ -1,8 +1,9 @@
 """Example page object - replace with your actual pages."""
 
 from selenium.webdriver.common.by import By
+from selenium.webdriver.remote.webdriver import WebDriver
 
-from src.pages.base_page import BasePage
+from pages.base_page import BasePage
 
 
 class ExamplePage(BasePage):
@@ -11,6 +12,6 @@ class ExamplePage(BasePage):
     # Locators
     EXAMPLE_LOCATOR = (By.ID, "example")
 
-    def __init__(self, driver):
+    def __init__(self, driver: WebDriver, browser: str, timeout: int = 10) -> None:
         """Initialize the example page."""
-        super().__init__(driver)
+        super().__init__(driver, browser=browser, timeout=timeout)
