@@ -1,0 +1,140 @@
+name: Tests
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+  schedule:
+    - cron: "0 2 * * *" # Nightly at 2 AM
+
+env:
+  PYTHON_VERSION: "3.11"
+
+jobs:
+  critical-tests:
+    runs-on: ubuntu-latest
+    name: Critical Tests
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: "pip"
+
+      - name: Install Poetry
+        run: |
+          curl -sSL https://install.python-poetry.org | python3 -
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
+          poetry --version
+
+      - name: Cache Poetry dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pypoetry
+          key: ${{ runner.os }}-poetry-${{ hashFiles('**/poetry.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-poetry-
+
+      - name: Install dependencies with Poetry
+        run: poetry install --no-root
+
+      - name: Set up Chrome
+        uses: browser-actions/setup-chrome@latest
+
+      - name: Run critical tests
+        run: |
+          poetry run pytest tests/ \
+            --browser=chrome \
+            --headless \
+            -m ci_critical \
+            --html-output=logs/report.html \
+            -v
+        env:
+          CI: true
+          PYTHONPATH: ${{ github.workspace }}/src
+
+      - name: Upload test report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: critical-test-report
+          path: logs/
+          retention-days: 7
+
+      - name: Upload failure screenshots
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: critical-screenshots
+          path: logs/*/screenshots/
+          retention-days: 3
+
+  full-tests:
+    if: github.event_name == 'schedule' || github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    name: Full Tests - ${{ matrix.browser }}
+    timeout-minutes: 20
+    strategy:
+      matrix:
+        browser: [chrome, firefox, edge]
+      fail-fast: false
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install Poetry
+        run: |
+          curl -sSL https://install.python-poetry.org | python3 -
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
+          poetry --version
+
+      - name: Cache Poetry dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pypoetry
+          key: ${{ runner.os }}-poetry-${{ hashFiles('**/poetry.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-poetry-
+
+      - name: Install dependencies with Poetry
+        run: poetry install
+
+      - name: Run tests - ${{ matrix.browser }}
+        run: |
+          poetry run pytest tests/ \
+            --browser=${{ matrix.browser }} \
+            --headless \
+            --html=logs/report_${{ matrix.browser }}.html \
+            --self-contained-html \
+            -v
+        env:
+          CI: true
+          PYTHONPATH: ${{ github.workspace }}/src
+
+      - name: Upload test report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-report-${{ matrix.browser }}
+          path: logs/
+          retention-days: 30
+
+      - name: Upload failure screenshots
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: screenshots-${{ matrix.browser }}
+          path: logs/*/screenshots/
+          retention-days: 7
