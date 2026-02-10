@@ -53,8 +53,7 @@ jobs:
             --browser=chrome \
             --headless \
             -m ci_critical \
-            --html=logs/report.html \
-            --self-contained-html \
+            --html-output=logs/report.html \
             -v
         env:
           CI: true
