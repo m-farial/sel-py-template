@@ -1,0 +1,115 @@
+name: Tests
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+  schedule:
+    - cron: '0 2 * * *'  # Nightly at 2 AM
+
+env:
+  PYTHON_VERSION: "3.11"
+
+jobs:
+  # Fast feedback: critical tests only
+  critical-tests:
+    runs-on: ubuntu-latest
+    name: Critical Tests
+    timeout-minutes: 10
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest pytest-html-plus
+
+      - name: Run critical tests
+        run: |
+          pytest tests/ \
+            --browser=chrome \
+            --headless \
+            -m ci_critical \
+            --html=logs/report.html \
+            --self-contained-html \
+            -v
+        env:
+          CI: true
+
+      - name: Upload test report
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: critical-test-report
+          path: logs/
+          retention-days: 7
+
+      - name: Upload failure screenshots
+        if: failure()
+        uses: actions/upload-artifact@v3
+        with:
+          name: critical-screenshots
+          path: logs/*/screenshots/
+          retention-days: 3
+
+  # Full suite: all browsers (only on schedule/main)
+  full-tests:
+    if: github.event_name == 'schedule' || github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    name: Full Tests - ${{ matrix.browser }}
+    timeout-minutes: 15
+    strategy:
+      matrix:
+        browser: [chrome, firefox, edge]
+      fail-fast: false
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest pytest-html-plus
+
+      - name: Run tests - ${{ matrix.browser }}
+        run: |
+          pytest tests/ \
+            --browser=${{ matrix.browser }} \
+            --headless \
+            --html=logs/report_${{ matrix.browser }}.html \
+            --self-contained-html \
+            -v
+        env:
+          CI: true
+
+      - name: Upload test report
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: test-report-${{ matrix.browser }}
+          path: logs/
+          retention-days: 30
+
+      - name: Upload failure screenshots
+        if: failure()
+        uses: actions/upload-artifact@v3
+        with:
+          name: screenshots-${{ matrix.browser }}
+          path: logs/*/screenshots/
+          retention-days: 7

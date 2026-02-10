@@ -13,7 +13,7 @@ from selenium.common.exceptions import (
     WebDriverException,
 )
 from selenium.webdriver.common.action_chains import ActionChains
-from selenium.webdriver.remote.alert import Alert
+from selenium.webdriver.common.alert import Alert
 from selenium.webdriver.remote.webdriver import WebDriver
 from selenium.webdriver.remote.webelement import WebElement
 from selenium.webdriver.support import expected_conditions as ec
@@ -675,9 +675,11 @@ class BasePage:
         return screenshot_path
 
     def get_alert(self, timeout: int = 5) -> Alert | None:
-        """Return the alert object if present within timeout, else None."""
         try:
-            return WebDriverWait(self.driver, timeout).until(ec.alert_is_present())
+            alert = WebDriverWait(self.driver, timeout).until(ec.alert_is_present())
+            if isinstance(alert, Alert):
+                return alert
+            return None
         except TimeoutException:
             return None
 
