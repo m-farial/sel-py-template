@@ -93,7 +93,7 @@ ignore_missing_imports = true
 [tool.poetry.group.dev.dependencies]
 pytest = "^9.0.2"
 black = "^26.1.0"
-isort = "^7.0.0"
+isort = "^8.0.0"
 ruff = "*"
 pre-commit = "^4.4.0"
 mypy = "^1.18.2"
