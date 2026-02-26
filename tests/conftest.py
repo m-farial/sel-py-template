@@ -147,9 +147,6 @@ def pytest_configure(config: pytest.Config) -> None:
     # Configure logging
     add_stream_handler(logging.getLogger(), level=logging.INFO, stream=sys.stdout)
 
-    # Configure pytest-html-plus screenshots
-    final_report_json_report_path: str = os.path.join(REPORT_DIR, "final_report.json")
-
     if not hasattr(config, "option"):
         logger.warning(
             "config.option not available - pytest-html-plus configuration skipped. "
@@ -162,7 +159,6 @@ def pytest_configure(config: pytest.Config) -> None:
         # Use the dedicated screenshots folder under logs (not the reports folder)
         config.option.screenshots = SCREENSHOTS_DIR
         config.option.a11y_reports = A11Y_DIR
-        config.option.json_report = final_report_json_report_path
 
     # Configure session logger
     sess_logger: logging.Logger | None = getattr(config, "_logger", None)
