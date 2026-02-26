@@ -158,7 +158,6 @@ def pytest_configure(config: pytest.Config) -> None:
         # Set pytest-html-plus output folders
         config.option.html_output = REPORT_DIR
         config.option.screenshots = REPORT_DIR
-        config.option.json_report = final_report_json_report_path
 
     # Configure session logger
     sess_logger: logging.Logger | None = getattr(config, "_logger", None)
