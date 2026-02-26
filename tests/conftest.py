@@ -146,9 +146,6 @@ def pytest_configure(config: pytest.Config) -> None:
     # Configure logging
     add_stream_handler(logging.getLogger(), level=logging.INFO, stream=sys.stdout)
 
-    # Configure pytest-html-plus screenshots
-    final_report_json_report_path: str = os.path.join(REPORT_DIR, "final_report.json")
-
     if not hasattr(config, "option"):
         logger.warning(
             "config.option not available - pytest-html-plus configuration skipped. "
@@ -158,7 +155,6 @@ def pytest_configure(config: pytest.Config) -> None:
         # Set pytest-html-plus output folders
         config.option.html_output = REPORT_DIR
         config.option.screenshots = REPORT_DIR
-        config.option.json_report = final_report_json_report_path
 
     # Configure session logger
     sess_logger: logging.Logger | None = getattr(config, "_logger", None)
