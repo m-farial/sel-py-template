@@ -1,9 +1,8 @@
 """Example page object - replace with your actual pages."""
 
+from .base_page import BasePage
 from selenium.webdriver.common.by import By
 from selenium.webdriver.remote.webdriver import WebDriver
-
-from pages.base_page import BasePage
 
 
 class ExamplePage(BasePage):

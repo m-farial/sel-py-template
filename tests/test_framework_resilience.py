@@ -18,12 +18,11 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from sel_py_template.pages.base_page import BasePage
 import pytest
 from selenium.webdriver.common.by import By
 from selenium.webdriver.remote.webdriver import WebDriver
-
-from pages.base_page import BasePage
-from ui.elements import Element, ElementType
+from sel_py_template.ui.elements import Element, ElementType
 
 
 def _write_html(tmp_path: Path, name: str, html: str) -> str:
@@ -47,7 +46,7 @@ def _write_html(tmp_path: Path, name: str, html: str) -> str:
 def _stub_logger_factory(monkeypatch: pytest.MonkeyPatch) -> None:
     """Stub LoggerFactory for test isolation."""
     try:
-        import pages.base_page as bp
+        import sel_py_template.pages.base_page as bp
     except ImportError:
         return
 

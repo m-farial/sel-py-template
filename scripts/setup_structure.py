@@ -65,10 +65,10 @@ def setup_framework_structure() -> None:
 
     # Define files with their content
     init_files = {
-        "src/__init__.py": '"""Source code package."""\n\n__version__ = "1.0.0"\n',
-        "src/pages/__init__.py": '"""Page Object Models package."""\n\nfrom src.pages.base_page import BasePage\n\n__all__ = ["BasePage"]\n',
-        "src/utils/__init__.py": '"""Utilities package."""\n\nfrom src.utils.logger_util import get_logger\n\n__all__ = ["get_logger"]\n',
-        "src/config/__init__.py": '"""Configuration package."""\n',
+        "sel_py_template/__init__.py": '"""Source code package."""\n\n__version__ = "1.0.0"\n',
+        "sel_py_template/pages/__init__.py": '"""Page Object Models package."""\n\nfrom sel_py_template.pages.base_page import BasePage\n\n__all__ = ["BasePage"]\n',
+        "sel_py_template/utils/__init__.py": '"""Utilities package."""\n\nfrom sel_py_template.utils.logger_util import get_logger\n\n__all__ = ["get_logger"]\n',
+        "sel_py_template/config/__init__.py": '"""Configuration package."""\n',
         "tests/__init__.py": '"""Test cases package."""\n',
         "scripts/__init__.py": '"""Utility scripts package."""\n',
     }
@@ -95,11 +95,11 @@ def setup_framework_structure() -> None:
 
     # Example page object
     create_file(
-        Path("src/pages/example_page.py"),
+        Path("src/sel_py_template/pages/example_page.py"),
         '''"""Example page object - replace with your actual pages."""
 
 from selenium.webdriver.common.by import By
-from pages.base_page import BasePage
+from sel_py_template.pages.base_page import BasePage
 
 
 class ExamplePage(BasePage):
@@ -114,7 +114,7 @@ class ExamplePage(BasePage):
 
     # Example utility
     create_file(
-        Path("src/utils/example_util.py"),
+        Path("src/sel_py_template/utils/example_util.py"),
         '''"""Example utility module."""
 
 def example_function() -> str:

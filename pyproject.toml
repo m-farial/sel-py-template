@@ -15,9 +15,11 @@ keywords = ["selenium", "testing", "python", "automation"]
 python = "^3.10"
 selenium = "^4.39"
 webdriver-manager = "==4.0.2"
+pytest-a11y = {path = "../pytest-a11y", develop = true}
 
 [[tool.poetry.packages]]
 include = "sel_py_template"
+from = "src"
 
 [tool.ruff]
 line-length = 88
@@ -68,7 +70,6 @@ check = ["fmt", "lint", "typecheck"]
 minversion = "7.0"
 addopts = "-q "
 report_title = "Selenium Python Template Test Report"
-pythonpath = ["src"]
 markers = ["a11y: mark test to run accessibility checks"]
 
 [tool.mypy]
