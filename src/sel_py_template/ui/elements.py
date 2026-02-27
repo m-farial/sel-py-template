@@ -14,7 +14,7 @@ from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.remote.webelement import WebElement
 from selenium.webdriver.support.ui import Select
 
-from pages.base_page import BasePage
+from ..pages.base_page import BasePage
 
 Locator = tuple[str, str]
 

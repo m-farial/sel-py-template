@@ -3,7 +3,7 @@
 from selenium.webdriver.common.by import By
 from selenium.webdriver.remote.webdriver import WebDriver
 
-from pages.base_page import BasePage
+from .base_page import BasePage
 
 
 class ExamplePage(BasePage):

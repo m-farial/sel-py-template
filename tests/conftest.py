@@ -24,8 +24,9 @@ from selenium.webdriver.edge.service import Service as EdgeService
 from selenium.webdriver.firefox.options import Options as FirefoxOptions
 from selenium.webdriver.firefox.service import Service as FirefoxService
 from selenium.webdriver.remote.webdriver import WebDriver
-from src.utils.logger_util import LoggerFactory
-from src.utils.report_plugin import ReportPlugin
+
+from sel_py_template.utils.logger_util import LoggerFactory
+from sel_py_template.utils.report_plugin import ReportPlugin
 
 date_str: str = datetime.now().strftime("%m-%d-%Y")
 LOG_PATH: str = os.path.join(os.getcwd(), "logs", date_str)
@@ -146,9 +147,6 @@ def pytest_configure(config: pytest.Config) -> None:
     # Configure logging
     add_stream_handler(logging.getLogger(), level=logging.INFO, stream=sys.stdout)
 
-    # Configure pytest-html-plus screenshots
-    final_report_json_report_path: str = os.path.join(REPORT_DIR, "final_report.json")
-
     if not hasattr(config, "option"):
         logger.warning(
             "config.option not available - pytest-html-plus configuration skipped. "
@@ -156,8 +154,11 @@ def pytest_configure(config: pytest.Config) -> None:
         )
     else:
         # Set pytest-html-plus output folders
-        config.option.html_output = REPORT_DIR
-        config.option.screenshots = REPORT_DIR
+        # Put HTML output in a subfolder so the JSON report isn't copied onto itself
+        config.option.html_output = os.path.join(REPORT_DIR, "html")
+        # Use the dedicated screenshots folder under logs (not the reports folder)
+        config.option.screenshots = SCREENSHOTS_DIR
+        config.option.a11y_reports = A11Y_DIR
 
     # Configure session logger
     sess_logger: logging.Logger | None = getattr(config, "_logger", None)
@@ -247,31 +248,31 @@ def pytest_generate_tests(metafunc: pytest.Metafunc) -> None:
             metafunc.parametrize("browser_name", [browser], scope="function")
 
 
-def pytest_runtest_makereport(
-    item: pytest.Item, call: pytest.CallInfo
-) -> None | pytest.TestReport:
-    """
-    Hook: Called after each test phase (setup, call, teardown).
+# def pytest_runtest_makereport(
+#     item: pytest.Item, call: pytest.CallInfo
+# ) -> None | pytest.TestReport:
+#     """
+#     Hook: Called after each test phase (setup, call, teardown).
 
-    Used to capture metadata about test execution. We use this to:
-      - Detect test failures
-      - Attach failure info so screenshot fixture can find it
-      - Track test outcomes
+#     Used to capture metadata about test execution. We use this to:
+#       - Detect test failures
+#       - Attach failure info so screenshot fixture can find it
+#       - Track test outcomes
 
-    **Advanced concept**: Hooks let pytest plugins/tests integrate into pytest's lifecycle.
+#     **Advanced concept**: Hooks let pytest plugins/tests integrate into pytest's lifecycle.
 
-    Args:
-        item: Test item being run (pytest.Item contains test metadata)
-        call: Result of the test phase (pytest.CallInfo has outcome, duration, etc.)
-    """
-    # Initialize attribute if not present
-    if not hasattr(item, "rep_call"):
-        item.rep_call = None
+#     Args:
+#         item: Test item being run (pytest.Item contains test metadata)
+#         call: Result of the test phase (pytest.CallInfo has outcome, duration, etc.)
+#     """
+#     # Initialize attribute if not present
+#     if not hasattr(item, "rep_call"):
+#         item.rep_call = None
 
-    # Store the call info for the actual test execution phase
-    # (not setup or teardown)
-    if call.when == "call":
-        item.rep_call = call
+#     # Store the call info for the actual test execution phase
+#     # (not setup or teardown)
+#     if call.when == "call":
+#         item.rep_call = call
 
 
 # ============================================================================
