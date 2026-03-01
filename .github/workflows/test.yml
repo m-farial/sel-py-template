@@ -6,7 +6,7 @@ on:
   pull_request:
     branches: [main, develop]
   schedule:
-    - cron: "0 2 * * *" # Nightly at 2 AM
+    - cron: "0 1 * * *" # Nightly at 1 AM
 
 env:
   PYTHON_VERSION: "3.11"
