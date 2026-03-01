@@ -1,6 +1,7 @@
 name: Tests
 
 on:
+  workflow_dispatch:   # add this temporarily
   push:
     branches: [main, develop]
   pull_request:
