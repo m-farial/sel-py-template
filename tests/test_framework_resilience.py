@@ -18,10 +18,11 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from sel_py_template.pages.base_page import BasePage
 import pytest
 from selenium.webdriver.common.by import By
 from selenium.webdriver.remote.webdriver import WebDriver
+
+from sel_py_template.pages.base_page import BasePage
 from sel_py_template.ui.elements import Element, ElementType
 
 
