@@ -104,7 +104,7 @@ fail_under = 90
 [tool.poetry.group.dev.dependencies]
 pytest = "^9.0.2"
 black = "^26.1.0"
-isort = "^7.0.0"
+isort = "^8.0.1"
 ruff = "*"
 mypy = "^1.18.2"
 safety = "^3.7.0"
