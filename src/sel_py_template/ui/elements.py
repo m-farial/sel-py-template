@@ -277,9 +277,6 @@ class BoundElement:
         return self
 
 
-# in elements.py
-
-
 class Element:
     def __init__(
         self,
