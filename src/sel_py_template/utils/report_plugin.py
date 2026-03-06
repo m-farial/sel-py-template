@@ -201,6 +201,7 @@ class ReportPlugin:
                 log_path = os.path.join(
                     self.base_log_dir, f"{item.name}_{timestamp}_failure.log"
                 )
+                os.makedirs(os.path.dirname(log_path), exist_ok=True)
                 with open(log_path, "w", encoding="utf-8") as f:
                     f.write(f"Test failed: {item.name}\n")
                     f.write(str(report.longrepr))

@@ -29,7 +29,6 @@ updates:
     allow:
       - dependency-type: "direct"
     ignore:
-      - dependency-name: "urllib3"
       - dependency-name: "typer"
       - dependency-name: "safety-schemas"
       - dependency-name: "*"
