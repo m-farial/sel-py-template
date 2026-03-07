@@ -68,12 +68,30 @@ class BoundElement:
 
     # ---------- locating / state ----------
     def find(self, timeout: int | None = None) -> WebElement:
+        self.page.logger.debug(
+            "BoundElement.find name=%s locator=%s timeout=%s",
+            self.defn.name,
+            self.locator,
+            timeout or self.defn.timeout_s,
+        )
         return self.page.wait_for(self.locator, timeout=timeout or self.defn.timeout_s)
 
     def is_visible(self, timeout: int = 5) -> bool:
+        self.page.logger.debug(
+            "Checking visibility for element name=%s locator=%s timeout=%s",
+            self.defn.name,
+            self.locator,
+            timeout,
+        )
         return self.page.is_displayed(self.locator, timeout=timeout)
 
     def is_enabled(self, timeout: int | None = None) -> bool:
+        self.page.logger.debug(
+            "Checking enabled state for element name=%s locator=%s timeout=%s",
+            self.defn.name,
+            self.locator,
+            timeout or self.defn.timeout_s,
+        )
         return bool(self.find(timeout=timeout).is_enabled())
 
     def enabled(self, timeout: int | None = None) -> bool:
@@ -84,50 +102,133 @@ class BoundElement:
 
     # ---------- common interactions ----------
     def scroll_into_view(self) -> BoundElement:
+        self.page.logger.debug(
+            "Scrolling element into view name=%s locator=%s",
+            self.defn.name,
+            self.locator,
+        )
         self.page.scroll_to(self.locator)
         return self
 
     def click(self, timeout: int | None = None) -> None:
+        self.page.logger.debug(
+            "Click requested for element name=%s locator=%s timeout=%s",
+            self.defn.name,
+            self.locator,
+            timeout or self.defn.timeout_s,
+        )
         self.page.click(self.locator, timeout=timeout or self.defn.timeout_s)
 
     def click_retry(self, timeout: int | None = None) -> None:
         """
         Scroll + click; if intercepted, scroll again and retry once.
         """
+        self.page.logger.debug(
+            "Click retry flow started for element name=%s locator=%s timeout=%s",
+            self.defn.name,
+            self.locator,
+            timeout or self.defn.timeout_s,
+        )
         try:
             self.scroll_into_view()
             self.page.click(self.locator, timeout=timeout or self.defn.timeout_s)
+            self.page.logger.debug(
+                "Click retry flow completed without needing retry for element name=%s locator=%s",
+                self.defn.name,
+                self.locator,
+            )
         except (ElementClickInterceptedException, StaleElementReferenceException):
+            self.page.logger.warning(
+                "Click intercepted or stale for element name=%s locator=%s. Retrying once.",
+                self.defn.name,
+                self.locator,
+            )
             self.scroll_into_view()
             self.page.click(self.locator, timeout=timeout or self.defn.timeout_s)
+            self.page.logger.debug(
+                "Click retry succeeded for element name=%s locator=%s",
+                self.defn.name,
+                self.locator,
+            )
 
     def hover(self) -> None:
+        self.page.logger.debug(
+            "Hover requested for element name=%s locator=%s",
+            self.defn.name,
+            self.locator,
+        )
         self.scroll_into_view()
         el = self.find()
         ActionChains(self.page.driver).move_to_element(el).perform()
+        self.page.logger.debug(
+            "Hover completed for element name=%s locator=%s",
+            self.defn.name,
+            self.locator,
+        )
 
     def wait_until_gone(self, timeout: int | None = None) -> None:
+        self.page.logger.debug(
+            "Waiting for element to disappear name=%s locator=%s timeout=%s",
+            self.defn.name,
+            self.locator,
+            timeout or self.defn.timeout_s,
+        )
         self.page.wait_for_element_to_disappear(
             self.locator, timeout=timeout or self.defn.timeout_s
         )
 
     # ---------- content ----------
     def text(self) -> str:
+        self.page.logger.debug(
+            "Reading text for element name=%s locator=%s",
+            self.defn.name,
+            self.locator,
+        )
         return self.page.get_text(self.locator)
 
     def value(self) -> str:
+        self.page.logger.debug(
+            "Reading value for element name=%s locator=%s",
+            self.defn.name,
+            self.locator,
+        )
         return self.page.get_attribute(self.locator, "value") or ""
 
     def attr(self, name: str) -> str:
+        self.page.logger.debug(
+            "Reading attribute name=%s for element defn_name=%s locator=%s",
+            name,
+            self.defn.name,
+            self.locator,
+        )
         return self.page.get_attribute(self.locator, name) or ""
 
     # ---------- typing / keyboard ----------
     def clear(self, timeout: int | None = None) -> None:
+        self.page.logger.debug(
+            "Clearing element name=%s locator=%s timeout=%s",
+            self.defn.name,
+            self.locator,
+            timeout or self.defn.timeout_s,
+        )
         self.find(timeout=timeout).clear()
+        self.page.logger.debug(
+            "Clear completed for element name=%s locator=%s",
+            self.defn.name,
+            self.locator,
+        )
 
     def type(
         self, text: str, *, clear_first: bool = True, timeout: int | None = None
     ) -> None:
+        self.page.logger.debug(
+            "Typing into element name=%s locator=%s clear_first=%s text_length=%s timeout=%s",
+            self.defn.name,
+            self.locator,
+            clear_first,
+            len(text),
+            timeout or self.defn.timeout_s,
+        )
         if self.defn.element_type not in {
             ElementType.TEXT_INPUT,
             ElementType.TEXTAREA,
@@ -141,6 +242,11 @@ class BoundElement:
         )
 
     def press_enter(self, timeout: int | None = None) -> None:
+        self.page.logger.debug(
+            "Sending ENTER to element name=%s locator=%s",
+            self.defn.name,
+            self.locator,
+        )
         self.page.send_keys(
             self.locator,
             Keys.ENTER,
@@ -149,6 +255,11 @@ class BoundElement:
         )
 
     def press_escape(self, timeout: int | None = None) -> None:
+        self.page.logger.debug(
+            "Sending ESCAPE to element name=%s locator=%s",
+            self.defn.name,
+            self.locator,
+        )
         self.page.send_keys(
             self.locator,
             Keys.ESCAPE,
@@ -157,6 +268,11 @@ class BoundElement:
         )
 
     def press_tab(self, timeout: int | None = None) -> None:
+        self.page.logger.debug(
+            "Sending TAB to element name=%s locator=%s",
+            self.defn.name,
+            self.locator,
+        )
         self.page.send_keys(
             self.locator,
             Keys.TAB,
@@ -166,6 +282,12 @@ class BoundElement:
 
     # ---------- checkables ----------
     def is_checked(self, timeout: int = 5) -> bool:
+        self.page.logger.debug(
+            "Checking selected state for element name=%s locator=%s timeout=%s",
+            self.defn.name,
+            self.locator,
+            timeout,
+        )
         if self.defn.element_type not in {
             ElementType.CHECKBOX,
             ElementType.RADIO,
@@ -175,21 +297,56 @@ class BoundElement:
         return bool(self.find(timeout=timeout).is_selected())
 
     def set_checked(self, checked: bool) -> None:
+        self.page.logger.debug(
+            "Setting checked state for element name=%s locator=%s target_state=%s",
+            self.defn.name,
+            self.locator,
+            checked,
+        )
         if self.defn.element_type not in {ElementType.CHECKBOX, ElementType.TOGGLE}:
             raise TypeError(f"set_checked() not supported for {self.defn.element_type}")
         if self.is_checked() != checked:
+            self.page.logger.debug(
+                "Checkbox/toggle state change required for element name=%s locator=%s",
+                self.defn.name,
+                self.locator,
+            )
             self.click_retry()
+        else:
+            self.page.logger.debug(
+                "Checkbox/toggle already in desired state for element name=%s locator=%s",
+                self.defn.name,
+                self.locator,
+            )
 
     def select_radio(self) -> None:
+        self.page.logger.debug(
+            "Selecting radio element name=%s locator=%s",
+            self.defn.name,
+            self.locator,
+        )
         if self.defn.element_type != ElementType.RADIO:
             raise TypeError("select_radio() only supports RADIO")
         if not self.is_checked():
             self.click_retry()
+        else:
+            self.page.logger.debug(
+                "Radio already selected for element name=%s locator=%s",
+                self.defn.name,
+                self.locator,
+            )
 
     # ---------- dropdown helpers ----------
     def select_option(
         self, *, value: str | None = None, text: str | None = None
     ) -> None:
+        self.page.logger.debug(
+            "Selecting dropdown option for element name=%s locator=%s value=%r text=%r",
+            self.defn.name,
+            self.locator,
+            value,
+            text,
+        )
         """
         Native-first dropdown selection:
           - If the element is a <select>, use selenium.support.ui.Select
@@ -201,8 +358,19 @@ class BoundElement:
         self.scroll_into_view()
         el = self.find()
         tag = (el.tag_name or "").lower()
+        self.page.logger.debug(
+            "Dropdown element name=%s locator=%s resolved tag=%s",
+            self.defn.name,
+            self.locator,
+            tag,
+        )
 
         if tag == "select":
+            self.page.logger.debug(
+                "Using native Select helper for element name=%s locator=%s",
+                self.defn.name,
+                self.locator,
+            )
             sel = Select(el)
             if value is not None:
                 sel.select_by_value(value)
@@ -213,6 +381,11 @@ class BoundElement:
             return
 
         # Custom dropdown: open it; option selection is app-specific.
+        self.page.logger.debug(
+            "Using custom dropdown click flow for element name=%s locator=%s",
+            self.defn.name,
+            self.locator,
+        )
         self.click_retry()
 
     # ---------- should assertions ----------
@@ -302,11 +475,22 @@ class Element:
             return self
 
         assert self._attr_name is not None
+        instance.logger.debug(
+            "Resolving bound element attr=%s locator=%s type=%s",
+            self._attr_name,
+            (self._by, self._value),
+            self._element_type,
+        )
         cache_name = f"__bound_el_{self._attr_name}"
         cached = instance.__dict__.get(cache_name)
         if cached is not None:
             cached_el = cast(BoundElement | None, cached)
             if isinstance(cached_el, BoundElement):
+                instance.logger.debug(
+                    "Returning cached bound element attr=%s locator=%s",
+                    self._attr_name,
+                    (self._by, self._value),
+                )
                 return cached_el
 
         definition = UIElementDef(
@@ -314,6 +498,13 @@ class Element:
             locator=(self._by, self._value),
             name=self._name or self._attr_name,
             timeout_s=self._timeout_s,
+        )
+        instance.logger.debug(
+            "Creating new bound element attr=%s locator=%s type=%s timeout=%s",
+            self._attr_name,
+            (self._by, self._value),
+            self._element_type,
+            self._timeout_s,
         )
         bound = BoundElement(instance, definition)
         instance.__dict__[cache_name] = bound
