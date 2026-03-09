@@ -9,10 +9,11 @@ Integrates with existing setup while adding:
   - Better error messages in CI logs
 """
 
+from __future__ import annotations
+
 from collections.abc import Generator
-from datetime import datetime
 import logging
-import os
+from pathlib import Path
 import sys
 
 import pytest
@@ -25,24 +26,11 @@ from selenium.webdriver.firefox.options import Options as FirefoxOptions
 from selenium.webdriver.firefox.service import Service as FirefoxService
 from selenium.webdriver.remote.webdriver import WebDriver
 
+from sel_py_template.utils.artifact_manager import ArtifactConfig, ArtifactManager
 from sel_py_template.utils.logger_util import LoggerFactory
 from sel_py_template.utils.report_plugin import ReportPlugin
 
-date_str: str = datetime.now().strftime("%m-%d-%Y")
-LOG_PATH: str = os.path.join(os.getcwd(), "logs", date_str)
-REPORT_DIR: str = os.path.join(LOG_PATH, "reports")
-A11Y_DIR: str = os.path.join(LOG_PATH, "a11y_reports")
-SCREENSHOTS_DIR: str = os.path.join(LOG_PATH, "screenshots")
-
-LoggerFactory.set_log_dir(LOG_PATH)
-LoggerFactory.set_report_dir(REPORT_DIR)
-LoggerFactory.set_a11y_dir(A11Y_DIR)
 logger: logging.Logger = logging.getLogger(__name__)
-
-
-# ============================================================================
-# HELPER FUNCTIONS
-# ============================================================================
 
 
 def add_stream_handler(
@@ -55,38 +43,29 @@ def add_stream_handler(
     Add a StreamHandler to logger if one doesn't already exist for that stream.
 
     Args:
-        logger: Logger instance to add handler to
-        level: Logging level (default: INFO)
-        stream: Stream to write to (default: stdout)
-        fmt: Log message format string (default: standard format)
+        logger: Logger instance to add handler to.
+        level: Logging level.
+        stream: Stream to write to.
+        fmt: Log message format string.
     """
-    # Avoid adding duplicates pointing to the same stream
-    for h in logger.handlers:
+    for handler in logger.handlers:
         if (
-            isinstance(h, logging.StreamHandler)
-            and getattr(h, "stream", None) is stream
+            isinstance(handler, logging.StreamHandler)
+            and getattr(handler, "stream", None) is stream
         ):
             return
 
-    handler: logging.StreamHandler = logging.StreamHandler(stream)
-    handler.setLevel(level)
+    stream_handler = logging.StreamHandler(stream)
+    stream_handler.setLevel(level)
     fmt = fmt or "%(asctime)s [%(levelname)s] [%(name)s] %(message)s"
-    handler.setFormatter(logging.Formatter(fmt))
-    logger.addHandler(handler)
+    stream_handler.setFormatter(logging.Formatter(fmt))
+    logger.addHandler(stream_handler)
 
 
 def _is_ci_environment() -> bool:
-    """
-    Detect if tests are running in CI environment.
+    """Detect whether tests are running in a CI environment."""
+    import os
 
-    **Type hints explanation**:
-      - -> bool means function returns a bool value
-      - os.getenv() returns str | None (string or nothing)
-      - == "true" converts that to a boolean check
-
-    Returns:
-        True if running in CI (GitHub Actions, GitLab CI, generic CI)
-    """
     return (
         os.getenv("GITHUB_ACTIONS") == "true"
         or os.getenv("GITLAB_CI") == "true"
@@ -94,43 +73,103 @@ def _is_ci_environment() -> bool:
     )
 
 
-# ============================================================================
-# PYTEST CONFIGURATION HOOKS
-# ============================================================================
+def _build_artifact_manager(config: pytest.Config, browser: str) -> ArtifactManager:
+    """Create the artifact manager for the current pytest session.
+
+    Args:
+        config: Pytest configuration object.
+        browser: Browser label used for naming run artifacts.
+
+    Returns:
+        Configured artifact manager with directories created.
+    """
+    artifact_config = ArtifactConfig(
+        base_dir=Path(config.getoption("--artifacts-dir")),
+        extra_artifacts=_resolve_extra_artifacts(config),
+    )
+    artifact_manager = ArtifactManager(
+        artifact_config,
+        browser=browser,
+        a11y_enabled=bool(getattr(config.option, "a11y", False)),
+    )
+    artifact_manager.create_directories()
+    return artifact_manager
+
+
+def _parse_extra_artifact(value: str) -> tuple[str, str]:
+    """Parse a NAME=PATH extra artifact definition."""
+    if "=" not in value:
+        raise pytest.UsageError(
+            f"Invalid --extra-artifact value: {value!r}. Expected NAME=PATH."
+        )
+
+    name, raw_path = value.split("=", 1)
+    name = name.strip()
+    raw_path = raw_path.strip()
+
+    if not name:
+        raise pytest.UsageError("Extra artifact name cannot be empty.")
+    if not raw_path:
+        raise pytest.UsageError("Extra artifact path cannot be empty.")
+
+    return name, raw_path
+
+
+def _parse_extra_artifacts_from_ini(config: pytest.Config) -> dict[str, str]:
+    """Parse extra artifact definitions from pytest.ini."""
+    raw_values = config.getini("extra_artifacts")
+    extra_artifacts: dict[str, str] = {}
+
+    for raw_value in raw_values:
+        name, path = _parse_extra_artifact(raw_value)
+        extra_artifacts[name] = path
+
+    return extra_artifacts
+
+
+def _parse_extra_artifacts_from_cli(config: pytest.Config) -> dict[str, str]:
+    """Parse repeatable --extra-artifact values from the command line."""
+    raw_values = config.getoption("--extra-artifact") or []
+    extra_artifacts: dict[str, str] = {}
+
+    for raw_value in raw_values:
+        name, path = _parse_extra_artifact(raw_value)
+        extra_artifacts[name] = path
+
+    return extra_artifacts
+
+
+def _resolve_extra_artifacts(config: pytest.Config) -> dict[str, str]:
+    """Merge ini and CLI extra artifact definitions, with CLI taking precedence."""
+    ini_artifacts = _parse_extra_artifacts_from_ini(config)
+    cli_artifacts = _parse_extra_artifacts_from_cli(config)
+    return {**ini_artifacts, **cli_artifacts}
 
 
 def pytest_configure(config: pytest.Config) -> None:
-    """
-    Configure pytest at session start.
-
-    This hook runs once per test session, before any tests run.
-    Used to:
-      - Create output directories
-      - Register plugins
-      - Register custom markers
-      - Configure logging
-
-    Args:
-        config: Pytest config object (manages command-line options, plugins, etc.)
-    """
-    # Create output directories
-    os.makedirs(LOG_PATH, exist_ok=True)
-    os.makedirs(REPORT_DIR, exist_ok=True)
-    os.makedirs(A11Y_DIR, exist_ok=True)
-    os.makedirs(SCREENSHOTS_DIR, exist_ok=True)
-
-    # Determine browser for plugin registration
+    """Configure pytest at session start."""
     browser: str = config.getoption("--browser") or "generic"
     if config.getoption("--all-browsers"):
         browser = "multi-browser"
 
-    # Register report plugin
-    plugin: ReportPlugin = ReportPlugin(
-        logs_dir=LOG_PATH, browser=browser, config=config
+    artifact_manager = _build_artifact_manager(config, browser)
+    config._artifact_manager = artifact_manager  # type: ignore[attr-defined]
+
+    LoggerFactory.set_browser(browser)
+    LoggerFactory.set_log_dir(artifact_manager.paths.run_root)
+    LoggerFactory.set_report_dir(artifact_manager.paths.pytest_html_dir)
+    LoggerFactory.set_a11y_dir(artifact_manager.paths.a11y_dir)
+    LoggerFactory.set_failure_screenshots_dir(
+        artifact_manager.paths.failure_screenshots_dir
+    )
+
+    plugin = ReportPlugin(
+        artifact_manager=artifact_manager,
+        browser=browser,
+        config=config,
     )
     config.pluginmanager.register(plugin, name=f"test_plugin_{browser}")
 
-    # Register custom markers for test categorization
     config.addinivalue_line(
         "markers",
         "ci_critical: tests that must pass in CI (failures block deployment)",
@@ -144,7 +183,6 @@ def pytest_configure(config: pytest.Config) -> None:
         "flaky: tests that may fail intermittently (require investigation)",
     )
 
-    # Configure logging
     add_stream_handler(logging.getLogger(), level=logging.INFO, stream=sys.stdout)
 
     if not hasattr(config, "option"):
@@ -153,34 +191,22 @@ def pytest_configure(config: pytest.Config) -> None:
             "This may indicate pytest-html-plus plugin is not installed or not loaded."
         )
     else:
-        # Set pytest-html-plus output folders
-        # Put HTML output in a subfolder so the JSON report isn't copied onto itself
-        config.option.html_output = os.path.join(REPORT_DIR, "html")
-        # Use the dedicated screenshots folder under logs (not the reports folder)
-        config.option.screenshots = SCREENSHOTS_DIR
-        config.option.a11y_reports = A11Y_DIR
+        config.option.html_output = str(artifact_manager.paths.pytest_html_dir)
+        config.option.screenshots = str(artifact_manager.paths.failure_screenshots_dir)
+        config.option.a11y_reports = str(artifact_manager.paths.a11y_dir)
 
-    # Configure session logger
-    sess_logger: logging.Logger | None = getattr(config, "_logger", None)
-    if sess_logger:
-        sess_logger.propagate = True
+    session_logger: logging.Logger | None = getattr(config, "_logger", None)
+    if session_logger:
+        session_logger.propagate = False
     else:
         logger.debug("config._logger not available")
 
-    logger.info(f"Pytest configured. Logs: {LOG_PATH}")
-    logger.info(f"CI environment detected: {_is_ci_environment()}")
+    logger.info("Pytest configured. Run root: %s", artifact_manager.paths.run_root)
+    logger.info("CI environment detected: %s", _is_ci_environment())
 
 
 def pytest_addoption(parser: pytest.Parser) -> None:
-    """
-    Add custom command-line options for test execution.
-
-    Allows users to control browser choice, headless mode, etc. via command line.
-    Example: pytest tests/ --all-browsers --headless -v
-
-    Args:
-        parser: Pytest command-line parser
-    """
+    """Add custom command-line options for test execution."""
     parser.addoption(
         "--browser",
         action="store",
@@ -207,7 +233,9 @@ def pytest_addoption(parser: pytest.Parser) -> None:
         help="Run browsers in interactive mode (visible browser window)",
     )
     parser.addini(
-        "report_title", "Default report title", default="Sauce demo tests report"
+        "report_title",
+        "Default report title",
+        default="Sauce demo tests report",
     )
     parser.addoption(
         "--report-title",
@@ -215,115 +243,56 @@ def pytest_addoption(parser: pytest.Parser) -> None:
         default=None,
         help="Custom report title (overrides pytest.ini)",
     )
+    parser.addoption(
+        "--artifacts-dir",
+        action="store",
+        default="artifacts",
+        help="Base directory for all test artifacts.",
+    )
+    parser.addoption(
+        "--extra-artifact",
+        action="append",
+        default=[],
+        metavar="NAME=PATH",
+        help=(
+            "Register an additional artifact directory. "
+            "May be passed multiple times. Example: --extra-artifact downloads=downloads"
+        ),
+    )
+    parser.addini(
+        "extra_artifacts",
+        type="linelist",
+        help="Additional artifact directories in NAME=PATH format.",
+        default=[],
+    )
 
 
 def pytest_generate_tests(metafunc: pytest.Metafunc) -> None:
-    """
-    Parametrize tests based on command-line options.
-
-    If a test has a `browser_name` fixture, this hook will:
-      - Run on all 3 browsers if --all-browsers is set
-      - Run on single browser if --browser is set
-
-    **Type hints**:
-      - metafunc: pytest.Metafunc provides test parametrization
-      - if "browser_name" in metafunc.fixturenames: checks if test needs this fixture
-      - metafunc.parametrize(): runs test multiple times with different values
-
-    Args:
-        metafunc: Pytest metafunc object (used for dynamic parametrization)
-
-    Example:
-        @pytest.mark.parametrize("browser_name", ["chrome", "firefox", "edge"])
-        def test_something(browser_name): ...
-    """
+    """Parametrize tests based on browser-related command-line options."""
     if "browser_name" in metafunc.fixturenames:
         if metafunc.config.getoption("--all-browsers"):
-            # Run on all browsers
             browsers: list[str] = ["chrome", "firefox", "edge"]
             metafunc.parametrize("browser_name", browsers, scope="function")
         else:
-            # Run on single specified browser
             browser: str = metafunc.config.getoption("--browser")
             metafunc.parametrize("browser_name", [browser], scope="function")
 
 
-# def pytest_runtest_makereport(
-#     item: pytest.Item, call: pytest.CallInfo
-# ) -> None | pytest.TestReport:
-#     """
-#     Hook: Called after each test phase (setup, call, teardown).
-
-#     Used to capture metadata about test execution. We use this to:
-#       - Detect test failures
-#       - Attach failure info so screenshot fixture can find it
-#       - Track test outcomes
-
-#     **Advanced concept**: Hooks let pytest plugins/tests integrate into pytest's lifecycle.
-
-#     Args:
-#         item: Test item being run (pytest.Item contains test metadata)
-#         call: Result of the test phase (pytest.CallInfo has outcome, duration, etc.)
-#     """
-#     # Initialize attribute if not present
-#     if not hasattr(item, "rep_call"):
-#         item.rep_call = None
-
-#     # Store the call info for the actual test execution phase
-#     # (not setup or teardown)
-#     if call.when == "call":
-#         item.rep_call = call
-
-
-# ============================================================================
-# PYTEST FIXTURES (Reusable setup/teardown for tests)
-# ============================================================================
-
-
 @pytest.fixture(scope="function")
 def driver(
-    browser_name: str, request: pytest.FixtureRequest, logger: logging.Logger
+    browser_name: str,
+    request: pytest.FixtureRequest,
+    logger: logging.Logger,
 ) -> Generator[WebDriver, None, None]:
-    """
-    Launch the requested browser and yield the WebDriver instance.
-
-    **Scope: function** (new driver per test - safest for CI isolation)
-
-    **Type hints**:
-      - Generator[WebDriver, None, None]:
-        - Yields: WebDriver instance
-        - Receives: None (no values sent back to test)
-        - Returns: None (no final value after cleanup)
-      - browser_name: str from pytest_generate_tests parametrization
-      - request: pytest.FixtureRequest gives access to config options
-      - logger: logging.Logger fixture from get_logger()
-
-    **How it works**:
-      1. Setup: Configure browser options, create WebDriver
-      2. yield: Pause here, run the test
-      3. Cleanup: Always runs (even if test fails), closes browser
-
-    Args:
-        browser_name: Name of the browser to launch (chrome, firefox, or edge)
-        request: Pytest request object to access config options
-        logger: Logger instance for logging browser events
-
-    Yields:
-        WebDriver: Selenium WebDriver instance for the specified browser
-
-    Raises:
-        ValueError: If an unsupported browser name is provided
-    """
-    # Detect if running in CI to apply optimizations
+    """Launch the requested browser and yield the WebDriver instance."""
     is_ci: bool = _is_ci_environment()
-
-    # Determine if headless mode should be used
-    # --interactive flag takes precedence over --headless
     headless: bool = not request.config.getoption("--interactive")
 
     mode: str = "headless" if headless else "interactive"
     env_info: str = " (CI environment)" if is_ci else " (local)"
-    logger.info(f"Starting {browser_name} browser session in {mode} mode{env_info}")
+    logger.info(
+        "Starting %s browser session in %s mode%s", browser_name, mode, env_info
+    )
 
     driver_instance: WebDriver
 
@@ -336,19 +305,17 @@ def driver(
             chrome_options.add_argument("--disable-gpu")
             chrome_options.add_argument("--window-size=1400,900")
 
-        # Common optimizations for all environments
         chrome_options.add_argument("--no-sandbox")
         chrome_options.add_argument("--disable-dev-shm-usage")
         chrome_options.set_capability("goog:loggingPrefs", {"browser": "ALL"})
 
-        # CI-specific optimizations: faster execution
         if is_ci:
-            # Disable images to speed up test execution
             chrome_options.add_argument("--blink-settings=imagesEnabled=false")
             logger.debug("CI mode: Disabled images for faster execution")
 
         driver_instance = webdriver.Chrome(
-            service=ChromeService(), options=chrome_options
+            service=ChromeService(),
+            options=chrome_options,
         )
 
     elif browser_name == "firefox":
@@ -358,13 +325,13 @@ def driver(
         firefox_options.add_argument("--width=1400")
         firefox_options.add_argument("--height=900")
 
-        # CI-specific: disable images
         if is_ci:
             firefox_options.set_preference("permissions.default.image", 2)
             logger.debug("CI mode: Disabled images for faster execution")
 
         driver_instance = webdriver.Firefox(
-            service=FirefoxService(), options=firefox_options
+            service=FirefoxService(),
+            options=firefox_options,
         )
 
     elif browser_name == "edge":
@@ -375,7 +342,6 @@ def driver(
             edge_options.add_argument("--window-size=1400,900")
         edge_options.add_argument("--start-maximized")
 
-        # CI-specific: disable images
         if is_ci:
             edge_options.add_argument("--blink-settings=imagesEnabled=false")
             logger.debug("CI mode: Disabled images for faster execution")
@@ -385,104 +351,52 @@ def driver(
     else:
         raise ValueError(f"Unsupported browser: {browser_name}")
 
-    # Configure timeouts (critical for CI reliability)
-    driver_instance.implicitly_wait(10)  # Implicit wait for element finding
-    driver_instance.set_page_load_timeout(30)  # Page load timeout
-    driver_instance.set_script_timeout(30)  # JavaScript execution timeout
+    driver_instance.implicitly_wait(10)
+    driver_instance.set_page_load_timeout(30)
+    driver_instance.set_script_timeout(30)
 
     try:
         yield driver_instance
     finally:
-        # Cleanup: always runs, even if test fails
-        logger.info(f"Closing {browser_name.title()} browser session")
+        logger.info("Closing %s browser session", browser_name.title())
         try:
             driver_instance.quit()
-        except Exception as e:
-            # Log but don't raise - cleanup failures shouldn't fail the test
-            logger.warning(f"Error closing browser: {e}")
+        except Exception as error:
+            logger.warning("Error closing browser: %s", error)
 
 
 @pytest.fixture(scope="function", autouse=True)
 def _capture_screenshot_on_failure(
-    request: pytest.FixtureRequest, driver: WebDriver
+    request: pytest.FixtureRequest,
+    driver: WebDriver,
 ) -> Generator[None, None, None]:
-    """
-    Fixture: Automatically capture a screenshot if a test fails.
-
-    **Scope: function** (per test)
-    **autouse: True** (automatically applied to all tests)
-
-    **Type hints**:
-      - request: pytest.FixtureRequest gives access to test metadata
-      - driver: WebDriver injected from driver fixture
-      - Generator[None, None, None]: yields nothing, just runs side effect
-
-    **How it works**:
-      1. yield pauses here (before test runs)
-      2. Test runs
-      3. After test, resumes and captures screenshot if failed
-
-    **Why separate from driver fixture**:
-      - Single Responsibility Principle: driver = setup/teardown
-      - This fixture = side effects (screenshots)
-      - Easier to disable if needed: @pytest.mark.no_screenshot
-
-    Args:
-        request: Pytest request object to check if test failed
-        driver: WebDriver to capture screenshot with
-
-    Yields:
-        None (side effect only)
-    """
+    """Capture a screenshot after a test fails when report call info is available."""
     yield
 
-    # After test completes, check if it failed
-    # Check for stored call info that has an exception
     if hasattr(request.node, "rep_call"):
-        call_info: pytest.CallInfo = request.node.rep_call
-        # Test failed if call has exception info
+        call_info: pytest.CallInfo[object] | None = request.node.rep_call
         if call_info is not None and call_info.excinfo is not None:
             try:
-                # Generate filename: test_name_FAILED.png
-                test_name: str = request.node.name
-                screenshot_filename: str = f"{test_name}_FAILED.png"
-                screenshot_path: str = os.path.join(
-                    SCREENSHOTS_DIR, screenshot_filename
+                artifact_manager: ArtifactManager = request.config._artifact_manager  # type: ignore[attr-defined]
+                screenshot_path = artifact_manager.failure_screenshot_path(
+                    request.node.name,
+                    "FAILED",
                 )
-
-                # Capture screenshot
-                driver.save_screenshot(screenshot_path)
-                logger.info(f"📸 Screenshot saved: {screenshot_path}")
-
-            except Exception as e:
-                # Don't fail the test if screenshot fails
-                logger.warning(f"⚠️  Failed to capture screenshot: {e}")
+                driver.save_screenshot(str(screenshot_path))
+                logger.info("📸 Screenshot saved: %s", screenshot_path)
+            except Exception as error:
+                logger.warning("⚠️  Failed to capture screenshot: %s", error)
 
 
 @pytest.fixture(scope="function")
-def get_logger() -> logging.Logger:
-    """
-    Provide a logger instance for tests.
-
-    **Scope: function** (new logger per test)
-
-    **Type hints**:
-      - -> logging.Logger means returns a Logger instance
-
-    Returns:
-        logging.Logger: Configured logger instance
-    """
-    return logging.getLogger(f"app.{__name__}")
+def get_logger(request: pytest.FixtureRequest) -> logging.Logger:
+    """Provide a browser-scoped logger for tests."""
+    session_logger: logging.Logger = request.config._logger  # type: ignore[attr-defined]
+    return session_logger.getChild("tests")
 
 
 @pytest.fixture(scope="session")
-def log_path() -> str:
-    """
-    Return the current log directory path.
-
-    **Scope: session** (same logger path for entire test run)
-
-    Returns:
-        str: Path to the logs directory for this test session
-    """
-    return LOG_PATH
+def log_path(pytestconfig: pytest.Config) -> str:
+    """Return the run root path for the current pytest session."""
+    artifact_manager: ArtifactManager = pytestconfig._artifact_manager  # type: ignore[attr-defined]
+    return str(artifact_manager.paths.run_root)

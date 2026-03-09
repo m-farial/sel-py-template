@@ -1,4 +1,4 @@
-# tests/conftest.py
+# tests/unit/conftest.py
 from __future__ import annotations
 
 from collections.abc import Callable, Iterator
@@ -172,6 +172,7 @@ def mock_page() -> MagicMock:
     Return a MagicMock page.
     """
     page = MagicMock(spec=BasePage)
+    page.logger = MagicMock()
     page.driver = MagicMock()
 
     page.wait_for.return_value = MagicMock()

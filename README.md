@@ -218,16 +218,50 @@ poetry run pytest tests/test_checkout.py::test_complete_purchase --interactive -
 
 ### Test Reports and Logs
 
-After running tests, reports are automatically generated:
+After running tests, reports are automatically generated using a centralized artifact manager that creates one folder per day and one folder per test run.:
 
 ```
-logs/YYYY-MM-DD_HH-MM-SS/
-├── report.html          # HTML test report
-└── screenshot/          # Screenshots on test failure
-    ├── test_name_chrome.png
-    ├── test_name_firefox.png
-    └── test_name_edge.png
+artifacts/
+└── YYYY-MM-DD/
+    └── run_HHMMSS/
+        ├── chrome_test_run_HH-MM-SS.log
+        ├── pytest_html/
+        │   ├── report.html
+        │   ├── plus_metadata.json
+        │   └── failure_screenshots/
+        └── a11y/
+            ├── a11y_report.html
+            └── violation_screenshots/
 ```
+- The run log file is written directly at the run root.
+- `pytest_html/` contains the regular HTML report artifacts.
+- `failure_screenshots/` lives under `pytest_html/`.
+- `a11y/` is created only when accessibility reporting is enabled.
+- `violation_screenshots/` lives under `a11y/`.
+
+With the artifact manager, every run is self-contained and easier to archive, inspect, or upload from CI.
+
+#### User-defined extra artifacts
+
+Users can register additional artifact folders without changing framework code.
+
+##### pytest.ini
+
+```ini
+[pytest]
+extra_artifacts =
+    downloads=downloads
+    videos=videos
+    traces=debug/traces
+```
+
+##### Command line
+
+```bash
+poetry run pytest \
+  --extra-artifact downloads=downloads \
+  --extra-artifact videos=videos \
+  --extra-artifact traces=debug/traces
 
 **Open the HTML report:**
 ```bash
@@ -240,6 +274,63 @@ open logs/2024-01-15_14-30-45/report.html
 # Linux
 xdg-open logs/2024-01-15_14-30-45/report.html
 ```
+
+##### Python configuration
+
+```python
+from pathlib import Path
+
+from sel_py_template.utils.artifact_manager import ArtifactConfig
+
+artifact_config = ArtifactConfig(
+    base_dir=Path("artifacts"),
+    extra_artifacts={
+        "downloads": "downloads",
+        "videos": "videos",
+        "traces": "debug/traces",
+    },
+)
+```
+
+#### Accessing extra artifacts in code
+
+```python
+def test_example(artifact_manager) -> None:
+    downloads_dir = artifact_manager.get_extra_dir("downloads")
+    trace_file = artifact_manager.get_extra_file("traces", "trace.zip")
+```
+
+Relative paths are created under the current run folder.
+
+For example:
+
+```text
+artifacts/
+└── 2026-03-05/
+    └── run_111344/
+        ├── chrome_test_run_11-13-44.log
+        ├── pytest_html/
+        ├── a11y/
+        ├── downloads/
+        ├── videos/
+        └── debug/
+            └── traces/
+```
+
+Absolute paths are also allowed if a team wants a specific artifact outside the run folder.
+
+#### Recommended usage
+
+Use `pytest.ini` for stable project-wide artifact folders and `--extra-artifact` for temporary CI or debug-only additions.
+
+#### Integration notes
+
+`pytest_configure(...)` is the right place to create the artifact manager once per session and store it on `config`, because that same hook already:
+- creates output directories
+- registers the report plugin
+- configures pytest-html-plus related paths fileciteturn3file8L54-L83
+
+`report_plugin.py` currently writes screenshots and failure logs using `self.base_log_dir`, and writes `plus_metadata.json` into the HTML output folder. Those are exactly the kinds of paths that benefit from central management. 
 
 ---
 

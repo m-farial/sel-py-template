@@ -1042,5 +1042,5 @@ def test_should_have_attr_assertion(driver: WebDriver, tmp_path: Path, logger) -
     page.navigate(url)
 
     # Attribute assertion should pass
-    page.button.should_have_attr("type", "submit")
+    page.button.should_have_attr("type", "submt")
     logger.info("✓ Attribute assertion passed")

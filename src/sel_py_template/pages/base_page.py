@@ -59,6 +59,12 @@ class BasePage:
         self.logger.debug(
             "Initialized InventoryPage with driver: %s", type(driver).__name__
         )
+        self.logger.debug(
+            "BasePage ready: page_class=%s browser=%s timeout=%ss",
+            self.__class__.__name__,
+            browser,
+            timeout,
+        )
 
     def navigate(self, url: str) -> None:
         """
@@ -68,7 +74,13 @@ class BasePage:
             url: URL to navigate to
         """
         self.logger.info(f"Navigating to: {url}")
+        self.logger.debug("Starting navigation to url=%s", url)
         self.driver.get(url)
+        self.logger.debug(
+            "Navigation complete. current_url=%s title=%s",
+            self.driver.current_url,
+            self.driver.title,
+        )
 
     # ============================================================================
     # OVERLOADED WAIT METHODS
@@ -154,7 +166,12 @@ class BasePage:
         """Wait until the element is present in the DOM and return it."""
         self.logger.debug(f"Waiting for element {locator} (timeout={timeout})")
         try:
-            return self.wait.until(ec.presence_of_element_located(locator))
+            self.logger.debug(
+                "Waiting for presence of locator=%s using timeout=%ss", locator, timeout
+            )
+            element = self.wait.until(ec.presence_of_element_located(locator))
+            self.logger.debug("Element located successfully: %s", locator)
+            return element
         except TimeoutException as e:
             msg = f"Timed out waiting for element {locator[0]}={locator[1]} after {timeout}s"
             self.logger.error(msg)
@@ -180,8 +197,14 @@ class BasePage:
             wait_time = timeout if timeout is not None else self.timeout
             wait: WebDriverWait[WebDriver] = WebDriverWait(self.driver, wait_time)
             wait.until(ec.invisibility_of_element_located(locator))
+            self.logger.debug("Element disappeared: %s", locator)
             return True
         except TimeoutException:
+            self.logger.warning(
+                "Timed out waiting for element to disappear: %s (timeout=%s)",
+                locator,
+                wait_time,
+            )
             return False
 
     # ============================================================================
@@ -241,6 +264,7 @@ class BasePage:
                 )
                 el = self.wait_until_clickable(target, timeout=timeout)
                 self._perform_click(el)
+                self.logger.debug("Click completed successfully for WebElement target")
 
             # Handle Locator tuple
             elif isinstance(target, tuple) and len(target) == 2:
@@ -249,6 +273,9 @@ class BasePage:
                 )
                 el = self.wait_until_clickable(target, timeout=timeout)
                 self._perform_click(el)
+                self.logger.debug(
+                    "Click completed successfully for locator target=%s", target
+                )
 
             else:
                 raise TypeError(
@@ -321,6 +348,12 @@ class BasePage:
             actions.move_to_element_with_offset(el, x_offset, y_offset)
             actions.click()
             actions.perform()
+            self.logger.debug(
+                "Click with offset completed for target=%s at offset=(%s, %s)",
+                target,
+                x_offset,
+                y_offset,
+            )
 
         except (
             ElementClickInterceptedException,
@@ -359,6 +392,9 @@ class BasePage:
             actions = ActionChains(self.driver)
             actions.double_click(el)
             actions.perform()
+            self.logger.debug(
+                "Double-click completed successfully for target=%s", target
+            )
 
         except (
             ElementClickInterceptedException,
@@ -397,6 +433,9 @@ class BasePage:
             actions = ActionChains(self.driver)
             actions.context_click(el)
             actions.perform()
+            self.logger.debug(
+                "Right-click completed successfully for target=%s", target
+            )
 
         except (
             ElementClickInterceptedException,
@@ -437,9 +476,15 @@ class BasePage:
             actions = ActionChains(self.driver)
             actions.click_and_hold(el)
             actions.perform()
+            self.logger.debug(
+                "Click-and-hold started for target=%s duration=%ss", target, duration
+            )
             time.sleep(duration)
             actions.release()
             actions.perform()
+            self.logger.debug(
+                "Click-and-hold completed for target=%s duration=%ss", target, duration
+            )
 
         except (
             ElementClickInterceptedException,
@@ -461,6 +506,7 @@ class BasePage:
             WebDriverException: If click action fails.
         """
         try:
+            self.logger.debug("Performing ActionChains click on WebElement")
             actions = ActionChains(self.driver)
             actions.move_to_element(element)
             actions.click(element)
@@ -488,7 +534,9 @@ class BasePage:
         """
         try:
             self.logger.debug(f"Finding element: {locator}")
-            return self.driver.find_element(*locator)
+            element = self.driver.find_element(*locator)
+            self.logger.debug("Element found successfully: %s", locator)
+            return element
         except NoSuchElementException as e:
             msg = f"Element not found: {locator[0]}={locator[1]}"
             self.logger.error(msg)
@@ -505,6 +553,7 @@ class BasePage:
             List of WebElements
         """
         try:
+            self.logger.debug("Finding all elements matching locator=%s", locator)
             elements = self.wait.until(ec.presence_of_all_elements_located(locator))
             self.logger.debug(f"Found {len(elements)} elements: {locator}")
             return elements
@@ -525,12 +574,18 @@ class BasePage:
         """
         try:
             self.logger.debug(
-                f"Sending keys to element: {locator} (text='{text}', clear_first={clear_first})"
+                "Sending keys to locator=%s clear_first=%s text_length=%s timeout=%s",
+                locator,
+                clear_first,
+                len(str(text)),
+                timeout,
             )
             el = self.wait_for(locator, timeout=timeout)
             if clear_first:
+                self.logger.debug("Clearing element before typing: %s", locator)
                 el.clear()
             el.send_keys(text)
+            self.logger.debug("Send keys completed for locator=%s", locator)
         except PageError:
             raise
         except (WebDriverException, Exception) as e:
@@ -551,7 +606,9 @@ class BasePage:
         self.logger.debug(f"Getting text from element: {locator}")
         element = self.find(locator)
         text = element.text
-        self.logger.debug(f"Got text from {locator}: {text}")
+        self.logger.debug(
+            "Got text from %s length=%s value=%r", locator, len(text), text
+        )
         return text
 
     def is_displayed(self, locator: Locator, timeout: int | None = 5) -> bool:
@@ -569,8 +626,15 @@ class BasePage:
             self.logger.debug(
                 f"Checking visibility for element: {locator} (timeout={timeout})"
             )
+            self.logger.debug(
+                "Waiting for element visibility locator=%s timeout=%s", locator, timeout
+            )
             el = self.wait.until(ec.visibility_of_element_located(locator))
-            return el.is_displayed()
+            visible = el.is_displayed()
+            self.logger.debug(
+                "Visibility check completed for %s result=%s", locator, visible
+            )
+            return visible
         except TimeoutException:
             self.logger.debug(f"Element not visible: {locator[0]}={locator[1]}")
             return False
@@ -592,6 +656,12 @@ class BasePage:
         element = self.find(locator)
         value = element.get_attribute(attribute)
         self.logger.debug(f"Got attribute '{attribute}' from {locator}: {value}")
+        self.logger.debug(
+            "Attribute lookup locator=%s attribute=%s found=%s",
+            locator,
+            attribute,
+            value is not None,
+        )
         return value
 
     def get_current_url(self) -> str:
@@ -601,6 +671,7 @@ class BasePage:
         Returns:
             Current URL
         """
+        self.logger.debug("Current URL requested: %s", self.driver.current_url)
         return self.driver.current_url
 
     def get_title(self) -> str:
@@ -610,12 +681,19 @@ class BasePage:
         Returns:
             Page title
         """
+        self.logger.debug("Page title requested: %s", self.driver.title)
         return self.driver.title
 
     def refresh_page(self) -> None:
         """Refresh the current page."""
         self.logger.info("Refreshing page")
+        self.logger.debug("Refreshing current page url=%s", self.driver.current_url)
         self.driver.refresh()
+        self.logger.debug(
+            "Page refresh complete. current_url=%s title=%s",
+            self.driver.current_url,
+            self.driver.title,
+        )
 
     def scroll_to(self, locator: Locator) -> None:
         """
@@ -624,6 +702,7 @@ class BasePage:
         Args:
             locator: Tuple of (By, value)
         """
+        self.logger.debug("Scrolling to element: %s", locator)
         element = self.find(locator)
         self.driver.execute_script("arguments[0].scrollIntoView(true);", element)
         self.logger.debug(f"Scrolled to element: {locator}")
@@ -639,7 +718,14 @@ class BasePage:
         Returns:
             Script return value
         """
-        return self.driver.execute_script(script, *args)
+        self.logger.debug(
+            "Executing JavaScript. script_preview=%r arg_count=%s",
+            script[:120],
+            len(args),
+        )
+        result = self.driver.execute_script(script, *args)
+        self.logger.debug("JavaScript execution completed successfully")
+        return result
 
     def switch_to_frame(self, frame_reference: int | str | WebElement) -> None:
         """
@@ -648,11 +734,13 @@ class BasePage:
         Args:
             frame_reference: Frame index, name, or WebElement
         """
+        self.logger.debug("Switching to frame: %s", frame_reference)
         self.driver.switch_to.frame(frame_reference)
         self.logger.info(f"Switched to frame: {frame_reference}")
 
     def switch_to_default_content(self) -> None:
         """Switch back to default content from iframe."""
+        self.logger.debug("Switching to default content")
         self.driver.switch_to.default_content()
         self.logger.info("Switched to default content")
 
@@ -670,36 +758,53 @@ class BasePage:
         target_dir = os.path.join(log_dir, file_path)
         os.makedirs(target_dir, exist_ok=True)
         screenshot_path = os.path.join(target_dir, filename)
+        self.logger.debug(
+            "Taking screenshot. file_path=%s filename=%s resolved_dir=%s",
+            file_path,
+            filename,
+            target_dir,
+        )
         self.driver.save_screenshot(screenshot_path)
         self.logger.info(f"Screenshot saved: {screenshot_path}")
         return screenshot_path
 
     def get_alert(self, timeout: int = 5) -> Alert | None:
+        self.logger.debug("Waiting for alert timeout=%ss", timeout)
         try:
             alert = WebDriverWait(self.driver, timeout).until(ec.alert_is_present())
             if isinstance(alert, Alert):
+                self.logger.debug("Alert detected with text=%r", alert.text)
                 return alert
+            self.logger.debug("Alert wait returned non-Alert object")
             return None
         except TimeoutException:
+            self.logger.debug("No alert present within timeout=%ss", timeout)
             return None
 
     def is_alert_present(self, timeout: int = 0) -> bool:
         """Quick check: if timeout>0 wait, otherwise check immediately."""
+        self.logger.debug("Checking alert presence timeout=%ss", timeout)
         try:
             if timeout:
-                return bool(self.get_alert(timeout))
+                present = bool(self.get_alert(timeout))
+                self.logger.debug("Alert presence check result=%s", present)
+                return present
             # immediate check (no wait)
             _ = self.driver.switch_to.alert
+            self.logger.debug("Alert is present")
             return True
         except (NoAlertPresentException, TimeoutException):
+            self.logger.debug("Alert is not present")
             return False
 
     def accept_alert(self, timeout: int = 5) -> str | None:
         """Accept alert if present and return its text, else None."""
+        self.logger.debug("Attempting to accept alert timeout=%ss", timeout)
         alert = self.get_alert(timeout)
         if alert:
             text = str(alert.text)
             alert.accept()
             self.logger.info("Accepted alert: %s", text)
             return text
+        self.logger.debug("No alert available to accept")
         return None

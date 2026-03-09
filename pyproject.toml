@@ -62,7 +62,7 @@ lint = "ruff check . --fix"
 lint-check = "ruff check ."
 typecheck = "mypy src"
 check = ["fmt", "lint", "typecheck"]
-coverage = "pytest --cov=sel_py_template --cov-report=term-missing --cov-report=xml tests/unit"
+coverage = "pytest tests/unit --cov=src/sel_py_template --cov-branch --cov-report=term-missing --no-cov-on-fail --cov-report=xml --cache-clear tests/unit -q"
 
 [tool.pytest.ini_options]
 minversion = "7.0"
@@ -99,7 +99,7 @@ omit = [
 ]
 
 [tool.coverage.report]
-fail_under = 90
+fail_under = 100
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^9.0.2"
