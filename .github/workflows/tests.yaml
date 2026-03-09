@@ -1,0 +1,176 @@
+name: Tests
+
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PYTHON_VERSION: "3.10"
+
+jobs:
+  unit-tests:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: "pip"
+
+      - name: Install Poetry
+        run: |
+          curl -sSL https://install.python-poetry.org | python3 -
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
+          poetry --version
+
+      - name: Cache Poetry dependencies
+        uses: actions/cache@v5
+        with:
+          path: ~/.cache/pypoetry
+          key: ${{ runner.os }}-poetry-${{ hashFiles('**/poetry.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-poetry-
+
+      - name: Install dependencies with Poetry
+        run: poetry install --no-root --no-interaction
+
+      - name: Run unit tests with coverage
+        env:
+          PYTHONPATH: ${{ github.workspace }}/src
+        run: |
+          poetry run pytest tests/unit \
+            --cov=src/sel_py_template \
+            --cov-branch \
+            --cov-report=term-missing \
+            --cov-report=xml \
+            --cov-fail-under=100
+            
+      - name: Add coverage to job summary
+        if: always()
+        shell: bash
+        run: |
+          python - <<'PY'
+          import xml.etree.ElementTree as ET
+          from pathlib import Path
+          import os
+
+          coverage_file = Path("coverage.xml")
+          summary_path = os.environ["GITHUB_STEP_SUMMARY"]
+
+          lines = ["## Coverage Summary", ""]
+
+          if not coverage_file.exists():
+              lines.append("Coverage report was not generated.")
+          else:
+              root = ET.parse(coverage_file).getroot()
+              line_rate = float(root.attrib.get("line-rate", 0.0))
+              branch_rate = float(root.attrib.get("branch-rate", 0.0))
+
+              lines.extend(
+                  [
+                      f"**Total line coverage:** `{line_rate * 100:.2f}%`",
+                      f"**Total branch coverage:** `{branch_rate * 100:.2f}%`",
+                      "",
+                      "| Metric | Value |",
+                      "|---|---:|",
+                      f"| Line coverage | {line_rate * 100:.2f}% |",
+                      f"| Branch coverage | {branch_rate * 100:.2f}% |",
+                  ]
+              )
+
+          with open(summary_path, "a", encoding="utf-8") as fh:
+              fh.write("\n".join(lines) + "\n")
+          PY
+
+      - name: Generate HTML coverage report
+        if: always()
+        run: poetry run coverage html
+
+      - name: Upload unit test coverage artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: unit-test-coverage
+          path: |
+            .coverage
+            coverage.xml
+            htmlcov/
+          if-no-files-found: ignore
+          retention-days: 7
+
+  integration-tests:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: unit-tests
+    if: ${{ github.actor != 'dependabot[bot]' || vars.INTEGRATION_TESTS_REQUIRE_NO_SECRETS == 'true' }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: "pip"
+
+      - name: Install Poetry
+        run: |
+          curl -sSL https://install.python-poetry.org | python3 -
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
+          poetry --version
+
+      - name: Cache Poetry dependencies
+        uses: actions/cache@v5
+        with:
+          path: ~/.cache/pypoetry
+          key: ${{ runner.os }}-poetry-${{ hashFiles('**/poetry.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-poetry-
+
+      - name: Install dependencies with Poetry
+        run: poetry install --no-root --no-interaction
+
+      - name: Set up Chrome
+        uses: browser-actions/setup-chrome@v1
+
+      - name: Run criticalintegration tests
+        env:
+          PYTHONPATH: ${{ github.workspace }}/src
+        run: |
+          poetry run pytest tests/integration \
+            -m "ci_critical" \
+            --browser=chrome \
+            --headless \
+            --html-output=logs/report.html \
+            -n auto
+
+      - name: Upload critical integration artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: critical-test-report
+          path: |
+            artifacts/
+          if-no-files-found: ignore
+          retention-days: 7
