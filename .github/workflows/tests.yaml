@@ -154,7 +154,7 @@ jobs:
       - name: Set up Chrome
         uses: browser-actions/setup-chrome@v1
 
-      - name: Run criticalintegration tests
+      - name: Run critical integration tests
         env:
           PYTHONPATH: ${{ github.workspace }}/src
         run: |

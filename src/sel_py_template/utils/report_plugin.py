@@ -214,7 +214,6 @@ class ReportPlugin:
                 self.session_logger.info("xx Failed Test %s", report.nodeid)
 
                 driver = item.funcargs.get("driver", None)  # type: ignore[attr-defined]
-                report.driver = driver
                 config = getattr(item, "config", None)
                 html_plus_enabled = False
                 if config:
