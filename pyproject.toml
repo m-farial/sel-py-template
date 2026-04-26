@@ -13,8 +13,9 @@ keywords = ["selenium", "testing", "python", "automation"]
 
 [tool.poetry.dependencies]
 python = "^3.10"
-selenium = "==4.40.0"
+selenium = "==4.41.0"
 webdriver-manager = "==4.0.2"
+pytest-a11y = {git = "https://github.com/m-farial/pytest-a11y.git"}
 
 [[tool.poetry.packages]]
 include = "sel_py_template"
@@ -69,7 +70,12 @@ minversion = "7.0"
 addopts = "-q "
 testpaths = ["tests/unit", "tests/integration"]
 report_title = "Selenium Python Template Test Report"
-markers = ["a11y: mark test to run accessibility checks"]
+markers = [
+    "integration: Integration tests (all integration tests should be marked with this)",
+    "a11y: Tests for accessibility",
+    "regression: Regression tests comparing against baselines",
+    "e2e: End-to-end tests that may involve multiple steps and validations",
+]
 
 [tool.mypy]
 python_version = "3.10"
@@ -92,10 +98,10 @@ ignore_missing_imports = true
 
 [tool.coverage.run]
 branch = true
-source = ["pytest_a11y"]
+source = ["sel_py_template"]
 omit = [
     "tests/*",
-    "src/pytest_a11y/__init__.py",
+    "src/sel_py_template/__init__.py",
 ]
 
 [tool.coverage.report]

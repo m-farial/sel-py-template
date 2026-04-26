@@ -5,12 +5,14 @@ Simple tests to verify Chrome, Firefox, and Edge are properly configured.
 Run with: poetry run pytest tests/test_browser_setup.py --all-browsers --headed
 """
 
+import pytest
 from selenium.webdriver.common.by import By
 from selenium.webdriver.remote.webdriver import WebDriver
 from selenium.webdriver.support import expected_conditions as ec
 from selenium.webdriver.support.ui import WebDriverWait
 
 
+@pytest.mark.e2e
 class TestBrowserSetup:
     """Smoke tests to verify browser setup."""
 

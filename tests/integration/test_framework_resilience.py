@@ -16,64 +16,15 @@ Run with:
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from pathlib import Path
 
 import pytest
 from selenium.webdriver.common.by import By
-from selenium.webdriver.remote.webdriver import WebDriver
+from tests.integration.helpers import write_html
 
 from sel_py_template.pages.base_page import BasePage
 from sel_py_template.ui.elements import Element, ElementType
-
-
-def _write_html(tmp_path: Path, name: str, html: str) -> str:
-    """
-    Helper: Write HTML to temporary file and return file:// URI.
-
-    Args:
-        tmp_path: pytest temporary directory fixture
-        name: filename to create
-        html: HTML content to write
-
-    Returns:
-        str: file:// URI pointing to the temporary HTML file
-    """
-    p: Path = tmp_path / name
-    p.write_text(html, encoding="utf-8")
-    return p.as_uri()
-
-
-@pytest.fixture(autouse=True)
-def _stub_logger_factory(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Stub LoggerFactory for test isolation."""
-    try:
-        import sel_py_template.pages.base_page as bp
-    except ImportError:
-        return
-
-    class _Logger:
-        def debug(self, *a: object, **k: object) -> None:
-            pass
-
-        def info(self, *a: object, **k: object) -> None:
-            pass
-
-        def warning(self, *a: object, **k: object) -> None:
-            pass
-
-        def error(self, *a: object, **k: object) -> None:
-            pass
-
-    class _LF:
-        @staticmethod
-        def get_logger(*a: object, **k: object) -> _Logger:
-            return _Logger()
-
-        @staticmethod
-        def get_log_dir() -> None:
-            return None
-
-    monkeypatch.setattr(bp, "LoggerFactory", _LF, raising=True)
 
 
 class ResilientPage(BasePage):
@@ -92,103 +43,102 @@ class ResilientPage(BasePage):
 
 
 @pytest.mark.ci_critical
-def test_element_wait_timeout_explicit(
-    driver: WebDriver, tmp_path: Path, logger
-) -> None:
-    """
-    Test: Explicit wait timeout for element that never appears.
+class TestElementFinding:
+    """Tests for element finding, waiting, and visibility behaviour."""
 
-    **Why CI-critical**:
-      - Verifies timeout mechanism works (test doesn't hang forever)
-      - Tests that exceptions are raised correctly
-      - Prevents infinite waits in CI pipelines
-
-    **Scenario**: Try to find non-existent element, verify timeout happens
-    **Expected**: Timeout exception after ~1 second
-    """
-    url: str = _write_html(
-        tmp_path,
-        "no_element.html",
+    def test_element_wait_timeout_explicit(
+        self, resilient_page: BasePage, tmp_path: Path, logger
+    ) -> None:
         """
+        Test: Explicit wait timeout for element that never appears.
+
+        **Why CI-critical**:
+          - Verifies timeout mechanism works (test doesn't hang forever)
+          - Tests that exceptions are raised correctly
+          - Prevents infinite waits in CI pipelines
+
+        **Scenario**: Try to find non-existent element, verify timeout happens
+        **Expected**: Timeout exception after ~1 second
+        """
+        url: str = write_html(
+            tmp_path,
+            "no_element.html",
+            """
 <!doctype html>
 <html>
   <body>
     <p>Empty page</p>
   </body>
 </html>
-        """,
-    )
-
-    page: ResilientPage = ResilientPage(driver, browser="chrome")
-    page.navigate(url)
-
-    # Try to find non-existent element with short timeout
-    try:
-        page.button.find(timeout=1)
-        # Should not reach here
-        raise AssertionError("Should have raised exception for missing element")
-    except Exception as e:
-        # Expected: ElementNotFoundError or similar
-        logger.info(f"✓ Correctly raised exception: {type(e).__name__}")
-        error_str: str = str(e).lower()
-        # Check for timeout message (case-insensitive)
-        assert "timed out" in error_str or "not found" in error_str, (
-            f"Expected 'timed out' or 'not found' in exception. Got: {str(e)[:100]}"
+            """,
         )
 
+        resilient_page.navigate(url)
 
-@pytest.mark.ci_critical
-def test_element_found_immediately(driver: WebDriver, tmp_path: Path, logger) -> None:
-    """
-    Test: Element that exists is found immediately.
+        # Try to find non-existent element with short timeout
+        try:
+            resilient_page.button.find(timeout=1)
+            # Should not reach here
+            raise AssertionError("Should have raised exception for missing element")
+        except Exception as e:
+            # Expected: ElementNotFoundError or similar
+            logger.info(f"✓ Correctly raised exception: {type(e).__name__}")
+            error_str: str = str(e).lower()
+            # Check for timeout message (case-insensitive)
+            assert "timed out" in error_str or "not found" in error_str, (
+                f"Expected 'timed out' or 'not found' in exception. Got: {str(e)[:100]}"
+            )
 
-    **Why CI-critical**:
-      - Baseline test: if this fails, element finding is broken
-      - Verifies wait_for() works for present elements
-      - Tests basic framework functionality
-
-    **Scenario**: Element exists from page load, find it
-    """
-    url: str = _write_html(
-        tmp_path,
-        "element_present.html",
+    def test_element_found_immediately(
+        self, resilient_page: BasePage, tmp_path: Path, logger
+    ) -> None:
         """
+        Test: Element that exists is found immediately.
+
+        **Why CI-critical**:
+          - Baseline test: if this fails, element finding is broken
+          - Verifies wait_for() works for present elements
+          - Tests basic framework functionality
+
+        **Scenario**: Element exists from page load, find it
+        """
+        url: str = write_html(
+            tmp_path,
+            "element_present.html",
+            """
 <!doctype html>
 <html>
   <body>
     <button id="btn">Click me</button>
   </body>
 </html>
-        """,
-    )
+            """,
+        )
 
-    page: ResilientPage = ResilientPage(driver, browser="chrome")
-    page.navigate(url)
+        resilient_page.navigate(url)
 
-    # Element should be found immediately
-    element = page.button.find(timeout=5)
-    assert element is not None, "Element should be found"
-    logger.info("✓ Element found immediately")
+        # Element should be found immediately
+        element = resilient_page.button.find(timeout=5)
+        assert element is not None, "Element should be found"
+        logger.info("✓ Element found immediately")
 
-
-@pytest.mark.ci_critical
-def test_element_appears_after_short_delay(
-    driver: WebDriver, tmp_path: Path, logger
-) -> None:
-    """
-    Test: Element appears after delay, wait catches it.
-
-    **Why CI-critical**:
-      - CI runners are slower than local machines
-      - Tests that waits correctly handle delayed elements
-      - Simulates real-world scenarios (lazy loading, animations)
-
-    **Scenario**: Element added to DOM after 300ms, should be found within 2s
-    """
-    url: str = _write_html(
-        tmp_path,
-        "delayed_element.html",
+    def test_element_appears_after_short_delay(
+        self, resilient_page: BasePage, tmp_path: Path, logger
+    ) -> None:
         """
+        Test: Element appears after delay, wait catches it.
+
+        **Why CI-critical**:
+          - CI runners are slower than local machines
+          - Tests that waits correctly handle delayed elements
+          - Simulates real-world scenarios (lazy loading, animations)
+
+        **Scenario**: Element added to DOM after 300ms, should be found within 2s
+        """
+        url: str = write_html(
+            tmp_path,
+            "delayed_element.html",
+            """
 <!doctype html>
 <html>
   <body>
@@ -203,59 +153,57 @@ def test_element_appears_after_short_delay(
     </script>
   </body>
 </html>
-        """,
-    )
+            """,
+        )
 
-    page: ResilientPage = ResilientPage(driver, browser="chrome")
-    page.navigate(url)
+        resilient_page.navigate(url)
 
-    # Element not present yet
-    logger.info("Element not yet added to DOM")
+        # Element not present yet
+        logger.info("Element not yet added to DOM")
 
-    # Wait for it - should find within 2s (300ms delay + buffer)
-    element = page.button.find(timeout=3)
-    assert element is not None, "Element should be found after delay"
-    logger.info("✓ Element found after being added to DOM")
+        # Wait for it - should find within 2s (300ms delay + buffer)
+        element = resilient_page.button.find(timeout=3)
+        assert element is not None, "Element should be found after delay"
+        logger.info("✓ Element found after being added to DOM")
 
-
-@pytest.mark.ci_critical
-def test_element_visibility_checking(driver: WebDriver, tmp_path: Path, logger) -> None:
-    """
-    Test: is_visible() distinguishes between present and visible elements.
-
-    **Why CI-critical**:
-      - is_visible() has different behavior than find()
-      - find() = element in DOM
-      - is_visible() = element visible to user
-      - Tests both checks work correctly
-
-    **Scenario**: Element in DOM but hidden, verify is_visible returns False
-    """
-    url: str = _write_html(
-        tmp_path,
-        "hidden_element.html",
+    def test_element_visibility_checking(
+        self, resilient_page: BasePage, tmp_path: Path, logger
+    ) -> None:
         """
+        Test: is_visible() distinguishes between present and visible elements.
+
+        **Why CI-critical**:
+          - is_visible() has different behavior than find()
+          - find() = element in DOM
+          - is_visible() = element visible to user
+          - Tests both checks work correctly
+
+        **Scenario**: Element in DOM but hidden, verify is_visible returns False
+        """
+        url: str = write_html(
+            tmp_path,
+            "hidden_element.html",
+            """
 <!doctype html>
 <html>
   <body>
     <button id="btn" style="display:none;">Hidden Button</button>
   </body>
 </html>
-        """,
-    )
+            """,
+        )
 
-    page: ResilientPage = ResilientPage(driver, browser="chrome")
-    page.navigate(url)
+        resilient_page.navigate(url)
 
-    # Element exists in DOM
-    element = page.button.find(timeout=2)
-    assert element is not None, "Element should be in DOM"
-    logger.info("✓ Element found in DOM")
+        # Element exists in DOM
+        element = resilient_page.button.find(timeout=2)
+        assert element is not None, "Element should be in DOM"
+        logger.info("✓ Element found in DOM")
 
-    # But not visible
-    is_visible: bool = page.button.is_visible(timeout=1)
-    assert not is_visible, "Hidden element should return False from is_visible()"
-    logger.info("✓ Element correctly detected as hidden")
+        # But not visible
+        is_visible: bool = resilient_page.button.is_visible(timeout=1)
+        assert not is_visible, "Hidden element should return False from is_visible()"
+        logger.info("✓ Element correctly detected as hidden")
 
 
 # ============================================================================
@@ -264,19 +212,24 @@ def test_element_visibility_checking(driver: WebDriver, tmp_path: Path, logger) 
 
 
 @pytest.mark.ci_critical
-def test_click_simple_button(driver: WebDriver, tmp_path: Path, logger) -> None:
-    """
-    Test: Click a visible button and verify result.
+class TestClickInteractions:
+    """Tests for click interactions and scroll-to-click resilience."""
 
-    **Why CI-critical**:
-      - Foundation test: if clicking fails, everything fails
-      - Tests basic user interaction
-      - Verifies click() works in headless mode
-    """
-    url: str = _write_html(
-        tmp_path,
-        "simple_click.html",
+    def test_click_simple_button(
+        self, resilient_page: BasePage, tmp_path: Path, logger
+    ) -> None:
         """
+        Test: Click a visible button and verify result.
+
+        **Why CI-critical**:
+          - Foundation test: if clicking fails, everything fails
+          - Tests basic user interaction
+          - Verifies click() works in headless mode
+        """
+        url: str = write_html(
+            tmp_path,
+            "simple_click.html",
+            """
 <!doctype html>
 <html>
   <body>
@@ -289,38 +242,37 @@ def test_click_simple_button(driver: WebDriver, tmp_path: Path, logger) -> None:
     </script>
   </body>
 </html>
-        """,
-    )
+            """,
+        )
 
-    page: ResilientPage = ResilientPage(driver, browser="chrome")
-    page.navigate(url)
+        resilient_page.navigate(url)
 
-    # Click button
-    page.button.click(timeout=5)
-    logger.info("✓ Button clicked")
+        # Click button
+        resilient_page.button.click(timeout=5)
+        logger.info("✓ Button clicked")
 
-    # Verify click worked
-    status: str = page.status.text()
-    assert status == "clicked", f"Expected 'clicked', got: {status!r}"
-    logger.info("✓ Click event handler executed")
+        # Verify click worked
+        status: str = resilient_page.status.text()
+        assert status == "clicked", f"Expected 'clicked', got: {status!r}"
+        logger.info("✓ Click event handler executed")
 
-
-@pytest.mark.ci_critical
-def test_click_retry_with_scroll(driver: WebDriver, tmp_path: Path, logger) -> None:
-    """
-    Test: click_retry() handles off-screen elements by scrolling.
-
-    **Why CI-critical**:
-      - Headless rendering can position elements differently
-      - click_retry() is key resilience pattern
-      - Tests that scroll + click logic works
-
-    **Scenario**: Element off-screen, click_retry scrolls and clicks
-    """
-    url: str = _write_html(
-        tmp_path,
-        "tall_page.html",
+    def test_click_retry_with_scroll(
+        self, resilient_page: BasePage, tmp_path: Path, logger
+    ) -> None:
         """
+        Test: click_retry() handles off-screen elements by scrolling.
+
+        **Why CI-critical**:
+          - Headless rendering can position elements differently
+          - click_retry() is key resilience pattern
+          - Tests that scroll + click logic works
+
+        **Scenario**: Element off-screen, click_retry scrolls and clicks
+        """
+        url: str = write_html(
+            tmp_path,
+            "tall_page.html",
+            """
 <!doctype html>
 <html>
   <body style="height:3000px;">
@@ -334,19 +286,18 @@ def test_click_retry_with_scroll(driver: WebDriver, tmp_path: Path, logger) -> N
     </script>
   </body>
 </html>
-        """,
-    )
+            """,
+        )
 
-    page: ResilientPage = ResilientPage(driver, browser="chrome")
-    page.navigate(url)
+        resilient_page.navigate(url)
 
-    # click_retry should scroll and click
-    page.button.click_retry(timeout=5)
-    logger.info("✓ click_retry() scrolled and clicked")
+        # click_retry should scroll and click
+        resilient_page.button.click_retry(timeout=5)
+        logger.info("✓ click_retry() scrolled and clicked")
 
-    # Verify click succeeded
-    status: str = page.status.text()
-    assert status == "clicked", f"Expected 'clicked', got: {status!r}"
+        # Verify click succeeded
+        status: str = resilient_page.status.text()
+        assert status == "clicked", f"Expected 'clicked', got: {status!r}"
 
 
 # ============================================================================
@@ -355,75 +306,95 @@ def test_click_retry_with_scroll(driver: WebDriver, tmp_path: Path, logger) -> N
 
 
 @pytest.mark.ci_critical
-def test_button_enabled_state(driver: WebDriver, tmp_path: Path, logger) -> None:
-    """
-    Test: Verify enabled button state.
+class TestElementState:
+    """Tests for element enabled/disabled state detection.
 
-    **Why CI-critical**:
-      - Tests is_enabled() for active elements
-      - Tests should_be_enabled() assertion
-      - Baseline: button is enabled by default
+    Parametrize notes
+    -----------------
+    ``test_button_state`` is parametrized over enabled and disabled cases.
+    Each case provides:
+      - ``html``              : the HTML page string to write to disk
+      - ``expected_enabled``  : the boolean is_enabled() should return
+      - ``assert_method_name``: the name of the assertion method to call on the
+                                element (``should_be_enabled`` or
+                                ``should_be_disabled``).
+
+    Inside the test body, ``getattr(resilient_page.button, assert_method_name)`` looks up
+    the method by name at runtime and returns it as a callable — a function
+    stored in a variable that can be invoked with ``()``.  This avoids an
+    if/else branch and keeps the parametrize table the single source of truth
+    for which assertion belongs to which case.
     """
-    url: str = _write_html(
-        tmp_path,
-        "enabled_button.html",
-        """
+
+    @pytest.mark.parametrize(
+        "html, expected_enabled, assert_method_name, label",
+        [
+            pytest.param(
+                """
 <!doctype html>
 <html>
   <body>
     <button id="btn">Click me</button>
   </body>
 </html>
-        """,
-    )
-
-    page: ResilientPage = ResilientPage(driver, browser="chrome")
-    page.navigate(url)
-
-    # Button should be enabled
-    is_enabled: bool = page.button.is_enabled()
-    assert is_enabled, "Button should be enabled"
-    logger.info("✓ Button is enabled")
-
-    # Assertion should pass
-    page.button.should_be_enabled()
-    logger.info("✓ should_be_enabled() passed")
-
-
-@pytest.mark.ci_critical
-def test_button_disabled_state(driver: WebDriver, tmp_path: Path, logger) -> None:
-    """
-    Test: Verify disabled button state.
-
-    **Why CI-critical**:
-      - Tests is_enabled() for inactive elements
-      - Tests should_be_disabled() assertion
-      - Disabled buttons shouldn't be clickable
-    """
-    url: str = _write_html(
-        tmp_path,
-        "disabled_button.html",
-        """
+                """,
+                True,
+                "should_be_enabled",
+                "enabled",
+                id="enabled",
+            ),
+            pytest.param(
+                """
 <!doctype html>
 <html>
   <body>
     <button id="btn" disabled>Click me</button>
   </body>
 </html>
-        """,
+                """,
+                False,
+                "should_be_disabled",
+                "disabled",
+                id="disabled",
+            ),
+        ],
     )
+    def test_button_state(
+        self,
+        resilient_page: BasePage,
+        tmp_path: Path,
+        logger,
+        html: str,
+        expected_enabled: bool,
+        assert_method_name: str,
+        label: str,
+    ) -> None:
+        """
+        Test: Verify button enabled/disabled state.
 
-    page: ResilientPage = ResilientPage(driver, browser="chrome")
-    page.navigate(url)
+        **Why CI-critical**:
+          - Tests is_enabled() for both active and inactive elements
+          - Tests should_be_enabled() and should_be_disabled() assertions
+          - Disabled buttons shouldn't be clickable
 
-    # Button should be disabled
-    is_enabled: bool = page.button.is_enabled()
-    assert not is_enabled, "Button should be disabled"
-    logger.info("✓ Button is disabled")
+        Parametrized over: enabled button, disabled button.
+        """
+        url: str = write_html(tmp_path, f"{label}_button.html", html)
 
-    # Assertion should pass
-    page.button.should_be_disabled()
-    logger.info("✓ should_be_disabled() passed")
+        resilient_page.navigate(url)
+
+        is_enabled: bool = resilient_page.button.is_enabled()
+        assert is_enabled == expected_enabled, (
+            f"Expected is_enabled()={expected_enabled} for {label} button, got {is_enabled}"
+        )
+        logger.info(f"✓ Button is {label}")
+
+        # Retrieve and call e.g. resilient_page.button.should_be_enabled() at runtime.
+        assert_method: Callable[[], None] = getattr(
+            resilient_page.button, assert_method_name
+        )
+        assert_method()
+        logger.info(f"✓ {assert_method_name}() passed")
 
 
 # ============================================================================
@@ -432,131 +403,141 @@ def test_button_disabled_state(driver: WebDriver, tmp_path: Path, logger) -> Non
 
 
 @pytest.mark.ci_critical
-def test_get_button_text(driver: WebDriver, tmp_path: Path, logger) -> None:
-    """
-    Test: Retrieve button text.
+class TestTextAndValues:
+    """Tests for text retrieval and value assertions on elements.
 
-    **Why CI-critical**:
-      - Tests text() getter
-      - Verifies HTML content extraction works
-      - Baseline for content assertions
+    Parametrize notes
+    -----------------
+    ``test_text_assertion_methods`` is parametrized over the two text assertion
+    methods.  Both write a page with a ``#status`` div and call one assertion
+    method on it — the only differences are the div's content, the method name,
+    and the argument passed to it.
+
+    ``test_get_button_text`` and ``test_input_value_getter`` each target a
+    different page element (``button`` vs ``input_field``) and use different
+    getters (``text()`` vs ``value()``), so merging them would require
+    conditional logic that obscures what is actually being tested.  They remain
+    as standalone tests.
     """
-    url: str = _write_html(
-        tmp_path,
-        "button_text.html",
+
+    def test_get_button_text(
+        self, resilient_page: BasePage, tmp_path: Path, logger
+    ) -> None:
         """
+        Test: Retrieve button text.
+
+        **Why CI-critical**:
+          - Tests text() getter
+          - Verifies HTML content extraction works
+          - Baseline for content assertions
+        """
+        url: str = write_html(
+            tmp_path,
+            "button_text.html",
+            """
 <!doctype html>
 <html>
   <body>
     <button id="btn">Click Here</button>
   </body>
 </html>
-        """,
+            """,
+        )
+
+        resilient_page.navigate(url)
+
+        # Get text
+        text: str = resilient_page.button.text()
+        assert text == "Click Here", f"Expected 'Click Here', got: {text!r}"
+        logger.info("✓ Button text retrieved correctly")
+
+    @pytest.mark.parametrize(
+        "status_text, assert_method_name, assert_arg",
+        [
+            pytest.param(
+                "User logged in: john123",
+                "should_contain_text",
+                "logged in",
+                id="contains",
+            ),
+            pytest.param(
+                "Ready",
+                "should_equal_text",
+                "Ready",
+                id="equals",
+            ),
+        ],
     )
-
-    page: ResilientPage = ResilientPage(driver, browser="chrome")
-    page.navigate(url)
-
-    # Get text
-    text: str = page.button.text()
-    assert text == "Click Here", f"Expected 'Click Here', got: {text!r}"
-    logger.info("✓ Button text retrieved correctly")
-
-
-@pytest.mark.ci_critical
-def test_should_contain_text(driver: WebDriver, tmp_path: Path, logger) -> None:
-    """
-    Test: should_contain_text() partial text matching.
-
-    **Why CI-critical**:
-      - Tests substring matching
-      - Useful for content with dynamic parts
-      - Tests assertion with helpful error messages
-
-    **Scenario**: Verify text contains expected substring
-    """
-    url: str = _write_html(
-        tmp_path,
-        "partial_text.html",
+    def test_text_assertion_methods(
+        self,
+        resilient_page: BasePage,
+        tmp_path: Path,
+        logger,
+        status_text: str,
+        assert_method_name: str,
+        assert_arg: str,
+    ) -> None:
         """
+        Test: should_contain_text() and should_equal_text() assertion methods.
+
+        **Why CI-critical**:
+          - should_contain_text() tests substring matching for dynamic content
+          - should_equal_text() tests strict matching when exact text is required
+          - Both produce helpful assertion error messages
+
+        Parametrized over: partial match (contains), exact match (equals).
+        """
+        url: str = write_html(
+            tmp_path,
+            f"text_{assert_method_name}.html",
+            f"""
 <!doctype html>
 <html>
   <body>
-    <div id="status">User logged in: john123</div>
+    <div id="status">{status_text}</div>
   </body>
 </html>
-        """,
-    )
+            """,
+        )
 
-    page: ResilientPage = ResilientPage(driver, browser="chrome")
-    page.navigate(url)
+        resilient_page.navigate(url)
 
-    # Partial text should match
-    page.status.should_contain_text("logged in")
-    logger.info("✓ Partial text matched")
+        assert_method: Callable[[str], None] = getattr(
+            resilient_page.status, assert_method_name
+        )
+        assert_method(assert_arg)
+        logger.info(f"✓ {assert_method_name}({assert_arg!r}) passed")
 
-
-@pytest.mark.ci_critical
-def test_should_equal_text(driver: WebDriver, tmp_path: Path, logger) -> None:
-    """
-    Test: should_equal_text() exact text matching.
-
-    **Why CI-critical**:
-      - Tests exact text (not substring)
-      - More strict than should_contain_text()
-      - Tests assertion when exact match needed
-    """
-    url: str = _write_html(
-        tmp_path,
-        "exact_text.html",
+    def test_input_value_getter(
+        self, resilient_page: BasePage, tmp_path: Path, logger
+    ) -> None:
         """
-<!doctype html>
-<html>
-  <body>
-    <div id="status">Ready</div>
-  </body>
-</html>
-        """,
-    )
+        Test: value() retrieves input field value.
 
-    page: ResilientPage = ResilientPage(driver, browser="chrome")
-    page.navigate(url)
-
-    # Exact text should match
-    page.status.should_equal_text("Ready")
-    logger.info("✓ Exact text matched")
-
-
-@pytest.mark.ci_critical
-def test_input_value_getter(driver: WebDriver, tmp_path: Path, logger) -> None:
-    """
-    Test: value() retrieves input field value.
-
-    **Why CI-critical**:
-      - Tests value() for input elements
-      - Different from text() (uses .value attribute)
-      - Baseline for form testing
-    """
-    url: str = _write_html(
-        tmp_path,
-        "input_value.html",
+        **Why CI-critical**:
+          - Tests value() for input elements
+          - Different from text() (uses .value attribute)
+          - Baseline for form testing
         """
+        url: str = write_html(
+            tmp_path,
+            "input_value.html",
+            """
 <!doctype html>
 <html>
   <body>
     <input id="input" type="text" value="initial">
   </body>
 </html>
-        """,
-    )
+            """,
+        )
 
-    page: ResilientPage = ResilientPage(driver, browser="chrome")
-    page.navigate(url)
+        resilient_page.navigate(url)
 
-    # Get value
-    value: str = page.input_field.value()
-    assert value == "initial", f"Expected 'initial', got: {value!r}"
-    logger.info("✓ Input value retrieved correctly")
+        # Get value
+        value: str = resilient_page.input_field.value()
+        assert value == "initial", f"Expected 'initial', got: {value!r}"
+        logger.info("✓ Input value retrieved correctly")
 
 
 # ============================================================================
@@ -565,115 +546,118 @@ def test_input_value_getter(driver: WebDriver, tmp_path: Path, logger) -> None:
 
 
 @pytest.mark.ci_critical
-def test_type_text_into_input(driver: WebDriver, tmp_path: Path, logger) -> None:
-    """
-    Test: Type text into input field.
+class TestFormInteractions:
+    """Tests for typing, clearing, and value assertions on form inputs.
 
-    **Why CI-critical**:
-      - Tests type() method in headless mode
-      - Verifies text input works
-      - Common pattern in form tests
+    Parametrize notes
+    -----------------
+    ``test_type_into_input`` is parametrized over two typing scenarios.  Both
+    write an HTML page with an ``<input>``, call ``type()``, and assert the
+    resulting ``value()``.  The only differences are whether the input starts
+    with an existing value (testing the clear-first behaviour) and what text
+    is typed.
+
+    ``test_should_have_value_assertion`` tests both the positive and negative
+    case of ``should_have_value()`` within a single body.  Splitting it into
+    two parametrized cases would mean the negative branch (the ``try/except``)
+    would need to be expressed differently for each, adding complexity without
+    reducing duplication.  It stays as a standalone test.
     """
-    url: str = _write_html(
-        tmp_path,
-        "input_typing.html",
+
+    @pytest.mark.parametrize(
+        "initial_value_attr, typed_text, expected_value",
+        [
+            pytest.param(
+                "",
+                "test123",
+                "test123",
+                id="type_into_empty",
+            ),
+            pytest.param(
+                'value="old"',
+                "new",
+                "new",
+                id="type_replaces_existing",
+            ),
+        ],
+    )
+    def test_type_into_input(
+        self,
+        resilient_page: BasePage,
+        tmp_path: Path,
+        logger,
+        initial_value_attr: str,
+        typed_text: str,
+        expected_value: str,
+    ) -> None:
         """
+        Test: type() writes text into an input; clear_first=True is the default.
+
+        **Why CI-critical**:
+          - Tests type() method in headless mode
+          - Verifies text input works on empty and pre-filled fields
+          - Verifies clear() + send_keys() pattern (clear_first=True default)
+
+        Parametrized over: empty input, input with pre-existing value.
+        """
+        url: str = write_html(
+            tmp_path,
+            "input_typing.html",
+            f"""
 <!doctype html>
 <html>
   <body>
-    <input id="input" type="text">
+    <input id="input" type="text" {initial_value_attr}>
   </body>
 </html>
-        """,
-    )
+            """,
+        )
 
-    page: ResilientPage = ResilientPage(driver, browser="chrome")
-    page.navigate(url)
+        resilient_page.navigate(url)
 
-    # Type text
-    page.input_field.type("test123")
-    logger.info("✓ Typed text into input")
+        resilient_page.input_field.type(typed_text)
+        logger.info(f"✓ Typed {typed_text!r} into input")
 
-    # Verify value
-    value: str = page.input_field.value()
-    assert value == "test123", f"Expected 'test123', got: {value!r}"
-    logger.info("✓ Input value verified")
+        value: str = resilient_page.input_field.value()
+        assert value == expected_value, f"Expected {expected_value!r}, got: {value!r}"
+        logger.info(f"✓ Input value is {expected_value!r} as expected")
 
-
-@pytest.mark.ci_critical
-def test_type_with_clear(driver: WebDriver, tmp_path: Path, logger) -> None:
-    """
-    Test: Type replaces existing value (clear_first=True by default).
-
-    **Why CI-critical**:
-      - Tests clear() + send_keys() pattern
-      - Verifies default behavior (clear_first=True)
-      - Important for form field replacement
-
-    **Scenario**: Input has initial value, type() should replace it
-    """
-    url: str = _write_html(
-        tmp_path,
-        "input_replace.html",
+    def test_should_have_value_assertion(
+        self, resilient_page: BasePage, tmp_path: Path, logger
+    ) -> None:
         """
-<!doctype html>
-<html>
-  <body>
-    <input id="input" type="text" value="old">
-  </body>
-</html>
-        """,
-    )
+        Test: should_have_value() assertion for input values.
 
-    page: ResilientPage = ResilientPage(driver, browser="chrome")
-    page.navigate(url)
-
-    # Type should clear and replace
-    page.input_field.type("new")
-    logger.info("✓ Typed replacement text")
-
-    # Verify it replaced (not appended)
-    value: str = page.input_field.value()
-    assert value == "new", f"Expected 'new', got: {value!r}"
-    logger.info("✓ Previous value was cleared and replaced")
-
-
-@pytest.mark.ci_critical
-def test_should_have_value_assertion(driver: WebDriver, tmp_path: Path, logger) -> None:
-    """
-    Test: should_have_value() assertion for input values.
-
-    **Why CI-critical**:
-      - Tests value assertion with error messages
-      - Useful for form verification
-      - Tests both positive and negative cases
-    """
-    url: str = _write_html(
-        tmp_path,
-        "input_assertion.html",
+        **Why CI-critical**:
+          - Tests value assertion with error messages
+          - Useful for form verification
+          - Tests both positive and negative cases
         """
+        url: str = write_html(
+            tmp_path,
+            "input_assertion.html",
+            """
 <!doctype html>
 <html>
   <body>
     <input id="input" type="text" value="expected">
   </body>
 </html>
-        """,
-    )
+            """,
+        )
 
-    page: ResilientPage = ResilientPage(driver, browser="chrome")
-    page.navigate(url)
+        resilient_page.navigate(url)
 
-    # Assertion should pass
-    page.input_field.should_have_value("expected")
-    logger.info("✓ Value assertion passed")
+        # Assertion should pass
+        resilient_page.input_field.should_have_value("expected")
+        logger.info("✓ Value assertion passed")
 
-    # Negative case: wrong value
-    try:
-        page.input_field.should_have_value("wrong")
-        raise AssertionError("Should have raised AssertionError")
-    except AssertionError as e:
-        logger.info(f"✓ Correctly raised AssertionError for wrong value: {e}")
+        # Negative case: wrong value
+        try:
+            resilient_page.input_field.should_have_value("wrong")
+            raise AssertionError("Should have raised AssertionError")
+        except AssertionError as e:
+            logger.info(f"✓ Correctly raised AssertionError for wrong value: {e}")
 
 
 # ============================================================================
@@ -682,106 +666,103 @@ def test_should_have_value_assertion(driver: WebDriver, tmp_path: Path, logger) 
 
 
 @pytest.mark.ci_critical
-def test_checkbox_checked_state(driver: WebDriver, tmp_path: Path, logger) -> None:
-    """
-    Test: Verify checkbox checked state.
+class TestCheckboxInteractions:
+    """Tests for checkbox state detection and toggling.
 
-    **Why CI-critical**:
-      - Tests is_checked() for checked checkboxes
-      - Tests checkbox state detection
-      - Baseline: initially unchecked
+    Parametrize notes
+    -----------------
+    ``test_checkbox_initial_state`` is parametrized over the checked and
+    unchecked cases.  Both render a checkbox with or without the ``checked``
+    HTML attribute and assert the value returned by ``is_checked()``.
+
+    ``test_set_checkbox_checked`` performs an interaction (toggling state) and
+    verifies a before/after transition — structurally different from the state
+    detection cases, so it remains a standalone test.
     """
-    url: str = _write_html(
-        tmp_path,
-        "checkbox_checked.html",
+
+    @pytest.mark.parametrize(
+        "checked_attr, expected_checked",
+        [
+            pytest.param("checked", True, id="initially_checked"),
+            pytest.param("", False, id="initially_unchecked"),
+        ],
+    )
+    def test_checkbox_initial_state(
+        self,
+        resilient_page: BasePage,
+        tmp_path: Path,
+        logger,
+        checked_attr: str,
+        expected_checked: bool,
+    ) -> None:
         """
+        Test: is_checked() reflects the initial HTML state of the checkbox.
+
+        **Why CI-critical**:
+          - Tests is_checked() for both checked and unchecked initial states
+          - Baseline for form validation and conditional logic
+
+        Parametrized over: initially checked, initially unchecked.
+        """
+        url: str = write_html(
+            tmp_path,
+            "checkbox_state.html",
+            f"""
 <!doctype html>
 <html>
   <body>
-    <input id="agree" type="checkbox" checked>
+    <input id="agree" type="checkbox" {checked_attr}>
   </body>
 </html>
-        """,
-    )
+            """,
+        )
 
-    page: ResilientPage = ResilientPage(driver, browser="chrome")
-    page.navigate(url)
+        resilient_page.navigate(url)
 
-    # Should be checked
-    is_checked: bool = page.checkbox.is_checked()
-    assert is_checked, "Checkbox should be checked"
-    logger.info("✓ Checkbox is checked")
+        is_checked: bool = resilient_page.checkbox.is_checked()
+        assert is_checked == expected_checked, (
+            f"Expected is_checked()={expected_checked}, got {is_checked}"
+        )
+        state_label: str = "checked" if expected_checked else "unchecked"
+        logger.info(f"✓ Checkbox is {state_label}")
 
-
-@pytest.mark.ci_critical
-def test_checkbox_unchecked_state(driver: WebDriver, tmp_path: Path, logger) -> None:
-    """
-    Test: Verify checkbox unchecked state.
-
-    **Why CI-critical**:
-      - Tests is_checked() for unchecked checkboxes
-      - Tests negative state
-      - Important for form validation
-    """
-    url: str = _write_html(
-        tmp_path,
-        "checkbox_unchecked.html",
+    def test_set_checkbox_checked(
+        self, resilient_page: BasePage, tmp_path: Path, logger
+    ) -> None:
         """
+        Test: set_checked(True) checks a checkbox.
+
+        **Why CI-critical**:
+          - Tests set_checked() method
+          - Tests click interaction triggered by checkbox
+          - Real scenario: form filling
+        """
+        url: str = write_html(
+            tmp_path,
+            "checkbox_toggle.html",
+            """
 <!doctype html>
 <html>
   <body>
     <input id="agree" type="checkbox">
   </body>
 </html>
-        """,
-    )
+            """,
+        )
 
-    page: ResilientPage = ResilientPage(driver, browser="chrome")
-    page.navigate(url)
+        resilient_page.navigate(url)
 
-    # Should be unchecked
-    is_checked: bool = page.checkbox.is_checked()
-    assert not is_checked, "Checkbox should be unchecked"
-    logger.info("✓ Checkbox is unchecked")
+        # Initially unchecked
+        assert not resilient_page.checkbox.is_checked(), "Should start unchecked"
 
+        # Set checked
+        resilient_page.checkbox.set_checked(True)
+        logger.info("✓ Set checkbox to checked")
 
-@pytest.mark.ci_critical
-def test_set_checkbox_checked(driver: WebDriver, tmp_path: Path, logger) -> None:
-    """
-    Test: set_checked(True) checks a checkbox.
-
-    **Why CI-critical**:
-      - Tests set_checked() method
-      - Tests click interaction triggered by checkbox
-      - Real scenario: form filling
-    """
-    url: str = _write_html(
-        tmp_path,
-        "checkbox_toggle.html",
-        """
-<!doctype html>
-<html>
-  <body>
-    <input id="agree" type="checkbox">
-  </body>
-</html>
-        """,
-    )
-
-    page: ResilientPage = ResilientPage(driver, browser="chrome")
-    page.navigate(url)
-
-    # Initially unchecked
-    assert not page.checkbox.is_checked(), "Should start unchecked"
-
-    # Set checked
-    page.checkbox.set_checked(True)
-    logger.info("✓ Set checkbox to checked")
-
-    # Verify checked
-    is_checked: bool = page.checkbox.is_checked()
-    assert is_checked, "Checkbox should now be checked"
-    logger.info("✓ Checkbox now checked")
+        # Verify checked
+        is_checked: bool = resilient_page.checkbox.is_checked()
+        assert is_checked, "Checkbox should now be checked"
+        logger.info("✓ Checkbox now checked")
 
 
 # ============================================================================
@@ -790,21 +771,26 @@ def test_set_checkbox_checked(driver: WebDriver, tmp_path: Path, logger) -> None
 
 
 @pytest.mark.ci_critical
-def test_select_option_by_value(driver: WebDriver, tmp_path: Path, logger) -> None:
-    """
-    Test: Select dropdown option by value.
+class TestDropdownInteractions:
+    """Tests for native <select> dropdown option selection."""
 
-    **Why CI-critical**:
-      - Tests select_option() with value parameter
-      - Tests native <select> element handling
-      - Common form pattern
-
-    **Scenario**: Select from <select> dropdown
-    """
-    url: str = _write_html(
-        tmp_path,
-        "select_dropdown.html",
+    def test_select_option_by_value(
+        self, resilient_page: BasePage, tmp_path: Path, logger
+    ) -> None:
         """
+        Test: Select dropdown option by value.
+
+        **Why CI-critical**:
+          - Tests select_option() with value parameter
+          - Tests native <select> element handling
+          - Common form pattern
+
+        **Scenario**: Select from <select> dropdown
+        """
+        url: str = write_html(
+            tmp_path,
+            "select_dropdown.html",
+            """
 <!doctype html>
 <html>
   <body>
@@ -821,20 +807,19 @@ def test_select_option_by_value(driver: WebDriver, tmp_path: Path, logger) -> No
     </script>
   </body>
 </html>
-        """,
-    )
+            """,
+        )
 
-    page: ResilientPage = ResilientPage(driver, browser="chrome")
-    page.navigate(url)
+        resilient_page.navigate(url)
 
-    # Select option by value
-    page.dropdown.select_option(value="admin")
-    logger.info("✓ Selected option by value")
+        # Select option by value
+        resilient_page.dropdown.select_option(value="admin")
+        logger.info("✓ Selected option by value")
 
-    # Verify selection
-    status: str = page.status.text()
-    assert "admin" in status, f"Expected 'admin' in status, got: {status!r}"
-    logger.info("✓ Dropdown selection verified")
+        # Verify selection
+        status: str = resilient_page.status.text()
+        assert "admin" in status, f"Expected 'admin' in status, got: {status!r}"
+        logger.info("✓ Dropdown selection verified")
 
 
 # ============================================================================
@@ -843,19 +828,35 @@ def test_select_option_by_value(driver: WebDriver, tmp_path: Path, logger) -> No
 
 
 @pytest.mark.ci_critical
-def test_press_enter_key(driver: WebDriver, tmp_path: Path, logger) -> None:
-    """
-    Test: Press Enter key and verify handler executes.
+class TestKeyboardInteractions:
+    """Tests for keyboard key presses (Enter, Escape, Tab).
 
-    **Why CI-critical**:
-      - Tests keyboard interaction (Enter)
-      - Tests key events in headless mode
-      - Real scenario: form submission
+    Parametrize notes
+    -----------------
+    ``test_key_press`` is parametrized over Enter, Escape, and Tab.  Each case
+    provides:
+      - ``html``              : the fixture page, including the JS event listener
+                                wired to that specific key
+      - ``filename``          : the HTML file name written to disk
+      - ``setup_action``      : a string flag for any interaction needed before
+                                pressing the key (typing text, clicking to focus,
+                                or nothing)
+      - ``press_method_name`` : the name of the press method on the element
+                                (``press_enter``, ``press_escape``, ``press_tab``)
+      - ``expected_status``   : the substring expected in the ``#status`` div
+
+    ``setup_action`` uses a small set of string flags (``"type_search"``,
+    ``"click_first"``, ``"none"``) rather than passing lambdas, keeping the
+    parametrize table readable as plain data.  ``getattr`` then resolves the
+    press method by name at runtime, the same pattern used in ``TestElementState``
+    and ``TestTextAndValues``.
     """
-    url: str = _write_html(
-        tmp_path,
-        "enter_key.html",
-        """
+
+    @pytest.mark.parametrize(
+        "html, filename, setup_action, press_method_name, expected_status",
+        [
+            pytest.param(
+                """
 <!doctype html>
 <html>
   <body>
@@ -870,36 +871,15 @@ def test_press_enter_key(driver: WebDriver, tmp_path: Path, logger) -> None:
     </script>
   </body>
 </html>
-        """,
-    )
-
-    page: ResilientPage = ResilientPage(driver, browser="chrome")
-    page.navigate(url)
-
-    # Type and press Enter
-    page.input_field.type("search")
-    page.input_field.press_enter()
-    logger.info("✓ Pressed Enter key")
-
-    # Verify handler executed
-    status: str = page.status.text()
-    assert "Submitted" in status, f"Expected 'Submitted' in status, got: {status!r}"
-    logger.info("✓ Enter key handler executed")
-
-
-@pytest.mark.ci_critical
-def test_press_escape_key(driver: WebDriver, tmp_path: Path, logger) -> None:
-    """
-    Test: Press Escape key and verify handler executes.
-
-    **Why CI-critical**:
-      - Tests keyboard interaction (Escape)
-      - Real scenario: close modals, cancel operations
-    """
-    url: str = _write_html(
-        tmp_path,
-        "escape_key.html",
-        """
+                """,
+                "enter_key.html",
+                "type_search",
+                "press_enter",
+                "Submitted",
+                id="enter",
+            ),
+            pytest.param(
+                """
 <!doctype html>
 <html>
   <body>
@@ -914,35 +894,15 @@ def test_press_escape_key(driver: WebDriver, tmp_path: Path, logger) -> None:
     </script>
   </body>
 </html>
-        """,
-    )
-
-    page: ResilientPage = ResilientPage(driver, browser="chrome")
-    page.navigate(url)
-
-    # Press Escape
-    page.input_field.press_escape()
-    logger.info("✓ Pressed Escape key")
-
-    # Verify handler executed
-    status: str = page.status.text()
-    assert status == "Cancelled", f"Expected 'Cancelled', got: {status!r}"
-    logger.info("✓ Escape key handler executed")
-
-
-@pytest.mark.ci_critical
-def test_press_tab_key(driver: WebDriver, tmp_path: Path, logger) -> None:
-    """
-    Test: Press Tab key for focus navigation.
-
-    **Why CI-critical**:
-      - Tests Tab key for accessibility testing
-      - Verifies focus movement
-    """
-    url: str = _write_html(
-        tmp_path,
-        "tab_navigation.html",
-        """
+                """,
+                "escape_key.html",
+                "none",
+                "press_escape",
+                "Cancelled",
+                id="escape",
+            ),
+            pytest.param(
+                """
 <!doctype html>
 <html>
   <body>
@@ -956,23 +916,60 @@ def test_press_tab_key(driver: WebDriver, tmp_path: Path, logger) -> None:
     </script>
   </body>
 </html>
-        """,
+                """,
+                "tab_navigation.html",
+                "click_first",
+                "press_tab",
+                "Button focused",
+                id="tab",
+            ),
+        ],
     )
+    def test_key_press(
+        self,
+        resilient_page: BasePage,
+        tmp_path: Path,
+        logger,
+        html: str,
+        filename: str,
+        setup_action: str,
+        press_method_name: str,
+        expected_status: str,
+    ) -> None:
+        """
+        Test: Key press methods (Enter, Escape, Tab) fire the correct handlers.
 
-    page: ResilientPage = ResilientPage(driver, browser="chrome")
-    page.navigate(url)
+        **Why CI-critical**:
+          - Tests keyboard interactions in headless mode
+          - Covers real scenarios: form submission (Enter), cancel (Escape),
+            and focus navigation (Tab)
 
-    # Focus on input first
-    page.input_field.click()
+        Parametrized over: Enter key, Escape key, Tab key.
+        """
+        url: str = write_html(tmp_path, filename, html)
 
-    # Press Tab to move focus to button
-    page.input_field.press_tab()
-    logger.info("✓ Pressed Tab key")
+        resilient_page.navigate(url)
 
-    # Verify focus moved (check if button handler fired)
-    status: str = page.status.text()
-    assert "Button focused" in status, f"Expected 'Button focused', got: {status!r}"
-    logger.info("✓ Tab key moved focus correctly")
+        # Some keys require setup before pressing:
+        #   "type_search" — Enter test needs text in the input first
+        #   "click_first" — Tab test needs the input focused first
+        #   "none"        — Escape test needs no setup
+        if setup_action == "type_search":
+            resilient_page.input_field.type("search")
+        elif setup_action == "click_first":
+            resilient_page.input_field.click()
+
+        press_method: Callable[[], None] = getattr(
+            resilient_page.input_field, press_method_name
+        )
+        press_method()
+        logger.info(f"✓ Called {press_method_name}()")
+
+        status: str = resilient_page.status.text()
+        assert expected_status in status, (
+            f"Expected {expected_status!r} in status, got: {status!r}"
+        )
+        logger.info(f"✓ {press_method_name} handler executed correctly")
 
 
 # ============================================================================
@@ -981,66 +978,69 @@ def test_press_tab_key(driver: WebDriver, tmp_path: Path, logger) -> None:
 
 
 @pytest.mark.ci_critical
-def test_get_element_attribute(driver: WebDriver, tmp_path: Path, logger) -> None:
-    """
-    Test: Retrieve HTML attribute from element.
+class TestAttributeAssertions:
+    """Tests for reading and asserting HTML element attributes."""
 
-    **Why CI-critical**:
-      - Tests attr() getter
-      - Real scenario: check data-* attributes, aria-* attributes
-    """
-    url: str = _write_html(
-        tmp_path,
-        "element_attributes.html",
+    def test_get_element_attribute(
+        self, resilient_page: BasePage, tmp_path: Path, logger
+    ) -> None:
         """
+        Test: Retrieve HTML attribute from element.
+
+        **Why CI-critical**:
+          - Tests attr() getter
+          - Real scenario: check data-* attributes, aria-* attributes
+        """
+        url: str = write_html(
+            tmp_path,
+            "element_attributes.html",
+            """
 <!doctype html>
 <html>
   <body>
     <button id="btn" data-testid="primary" aria-label="Submit form">Submit</button>
   </body>
 </html>
-        """,
-    )
+            """,
+        )
 
-    page: ResilientPage = ResilientPage(driver, browser="chrome")
-    page.navigate(url)
+        resilient_page.navigate(url)
 
-    # Get custom attribute
-    testid: str = page.button.attr("data-testid")
-    assert testid == "primary", f"Expected 'primary', got: {testid!r}"
-    logger.info("✓ Custom attribute retrieved")
+        # Get custom attribute
+        testid: str = resilient_page.button.attr("data-testid")
+        assert testid == "primary", f"Expected 'primary', got: {testid!r}"
+        logger.info("✓ Custom attribute retrieved")
 
-    # Get aria attribute
-    label: str = page.button.attr("aria-label")
-    assert label == "Submit form", f"Expected 'Submit form', got: {label!r}"
-    logger.info("✓ Aria attribute retrieved")
+        # Get aria attribute
+        label: str = resilient_page.button.attr("aria-label")
+        assert label == "Submit form", f"Expected 'Submit form', got: {label!r}"
+        logger.info("✓ Aria attribute retrieved")
 
-
-@pytest.mark.ci_critical
-def test_should_have_attr_assertion(driver: WebDriver, tmp_path: Path, logger) -> None:
-    """
-    Test: should_have_attr() assertion for attributes.
-
-    **Why CI-critical**:
-      - Tests attribute assertion with helpful errors
-      - Useful for accessibility and data attribute checks
-    """
-    url: str = _write_html(
-        tmp_path,
-        "attr_assertion.html",
+    def test_should_have_attr_assertion(
+        self, resilient_page: BasePage, tmp_path: Path, logger
+    ) -> None:
         """
+        Test: should_have_attr() assertion for attributes.
+
+        **Why CI-critical**:
+          - Tests attribute assertion with helpful errors
+          - Useful for accessibility and data attribute checks
+        """
+        url: str = write_html(
+            tmp_path,
+            "attr_assertion.html",
+            """
 <!doctype html>
 <html>
   <body>
     <button id="btn" type="submit">Submit</button>
   </body>
 </html>
-        """,
-    )
+            """,
+        )
 
-    page: ResilientPage = ResilientPage(driver, browser="chrome")
-    page.navigate(url)
+        resilient_page.navigate(url)
 
-    # Attribute assertion should pass
-    page.button.should_have_attr("type", "submit")
-    logger.info("✓ Attribute assertion passed")
+        # Attribute assertion should pass
+        resilient_page.button.should_have_attr("type", "submit")
+        logger.info("✓ Attribute assertion passed")
