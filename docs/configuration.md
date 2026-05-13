@@ -21,7 +21,7 @@ Or configure defaults in your test setup.
 Environment-specific settings can be managed via:
 
 * environment variables
-* configuration files in `src/config/`
+* configuration files in `src/sel_py_template/config/`
 
 Example:
 
@@ -98,7 +98,7 @@ poetry run pytest --a11y --a11y-standard wcag2aa
 Logging is managed through utilities in:
 
 ```text
-src/utils/
+src/sel_py_template/utils/
 ```
 
 Logs are automatically captured per test run.

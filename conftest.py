@@ -7,6 +7,11 @@ Integrates with existing setup while adding:
   - Test markers for categorization (ci_critical, slow, flaky)
   - Explicit timeout configuration
   - Better error messages in CI logs
+
+TEMPLATE OWNERS NOTE:
+  This file is template-owned. Downstream users should NOT modify it.
+  To customise report titles, artifact directories, and ini options,
+  edit pytest.ini in your project root instead.
 """
 
 from __future__ import annotations
@@ -237,14 +242,14 @@ def pytest_addoption(parser: pytest.Parser) -> None:
     )
     parser.addini(
         "report_title",
-        "Default report title",
-        default="Sauce demo tests report",
+        "Title shown in the HTML test report. Override this in your pytest.ini.",
+        default="Test Report",  # generic default — downstream projects set this in pytest.ini
     )
     parser.addoption(
         "--report-title",
         action="store",
         default=None,
-        help="Custom report title (overrides pytest.ini)",
+        help="Custom report title (overrides pytest.ini report_title)",
     )
     parser.addoption(
         "--artifacts-dir",

@@ -5,8 +5,8 @@ from pathlib import Path
 import pytest
 from selenium.webdriver.common.by import By
 from selenium.webdriver.remote.webdriver import WebDriver
-from tests.integration.fixtures_html import FORM_WORKFLOW_HTML
-from tests.integration.helpers import write_html
+from template_tests.integration.fixtures_html import FORM_WORKFLOW_HTML
+from template_tests.integration.helpers import write_html
 
 from sel_py_template.pages.base_page import BasePage
 from sel_py_template.ui.elements import Element, ElementType
@@ -62,6 +62,7 @@ class TestSmokeWorkflow:
     def test_end_to_end_form_workflow_local_fixture(
         self,
         driver: WebDriver,
+        browser_name: str,
         tmp_path: Path,
         logger,
     ) -> None:
@@ -69,7 +70,7 @@ class TestSmokeWorkflow:
         Run a full local end-to-end workflow through the template page-object layer.
         """
         url = write_html(tmp_path, "form_workflow.html", FORM_WORKFLOW_HTML)
-        page = WorkflowPage(driver, browser="chrome")
+        page = WorkflowPage(driver, browser=browser_name)
 
         page.navigate(url)
 

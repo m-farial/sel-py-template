@@ -5,18 +5,18 @@ from pathlib import Path
 import pytest
 from pytest_a11y import assert_no_axe_violations
 from selenium.webdriver.remote.webdriver import WebDriver
-from tests.integration.fixtures_html import (
+from template_tests.integration.fixtures_html import (
     A11Y_ACCESSIBLE_HTML,
     A11Y_INACCESSIBLE_HTML,
 )
-from tests.integration.helpers import (
+from template_tests.integration.helpers import (
     assert_axe_result_shape,
     collect_rule_ids,
     count_violations,
     write_html,
 )
 
-pytestmark = pytest.mark.a11y
+pytestmark = [pytest.mark.a11y, pytest.mark.integration]
 
 
 @pytest.mark.a11y

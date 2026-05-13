@@ -6,15 +6,15 @@ from pathlib import Path
 
 import pytest
 from pytest_a11y import assert_no_critical_violations
-from tests.integration.fixtures_html import (
+from template_tests.integration.fixtures_html import (
     BROKEN_PAGE_HTML,
     BROKEN_PAGE_HTML_NAME,
     SIMPLE_PAGE_HTML,
     SIMPLE_PAGE_HTML_NAME,
 )
-from tests.integration.helpers import write_html
+from template_tests.integration.helpers import write_html
 
-pytestmark = pytest.mark.a11y
+pytestmark = [pytest.mark.a11y, pytest.mark.integration]
 
 
 @pytest.mark.a11y

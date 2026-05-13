@@ -20,11 +20,14 @@ from collections.abc import Callable
 from pathlib import Path
 
 import pytest
+from selenium.common.exceptions import NoSuchElementException, TimeoutException
 from selenium.webdriver.common.by import By
-from tests.integration.helpers import write_html
+from template_tests.integration.helpers import write_html
 
 from sel_py_template.pages.base_page import BasePage
 from sel_py_template.ui.elements import Element, ElementType
+
+pytestmark = pytest.mark.integration
 
 
 class ResilientPage(BasePage):
@@ -76,18 +79,14 @@ class TestElementFinding:
         resilient_page.navigate(url)
 
         # Try to find non-existent element with short timeout
-        try:
+        with pytest.raises((TimeoutException, NoSuchElementException)) as exc_info:
             resilient_page.button.find(timeout=1)
-            # Should not reach here
-            raise AssertionError("Should have raised exception for missing element")
-        except Exception as e:
-            # Expected: ElementNotFoundError or similar
-            logger.info(f"✓ Correctly raised exception: {type(e).__name__}")
-            error_str: str = str(e).lower()
-            # Check for timeout message (case-insensitive)
-            assert "timed out" in error_str or "not found" in error_str, (
-                f"Expected 'timed out' or 'not found' in exception. Got: {str(e)[:100]}"
-            )
+
+        error_str: str = str(exc_info.value).lower()
+        assert "timed out" in error_str or "not found" in error_str, (
+            f"Expected 'timed out' or 'not found' in exception. Got: {str(exc_info.value)[:100]}"
+        )
+        logger.info(f"✓ Correctly raised exception: {type(exc_info.value).__name__}")
 
     def test_element_found_immediately(
         self, resilient_page: BasePage, tmp_path: Path, logger

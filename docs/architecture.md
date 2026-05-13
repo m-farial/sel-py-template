@@ -83,7 +83,7 @@ def test_login(driver, login_page):
 Located in:
 
 ```text
-src/pages/
+src/sel_py_template/pages/
 ```
 
 Responsibilities:
@@ -279,9 +279,10 @@ Supports:
 sel-py-template
 │
 ├── src/
-│   ├── pages/
-│   ├── utils/
-│   └── config/
+│   └── sel_py_template/
+│       ├── pages/
+│       ├── utils/
+│       └── config/
 │
 ├── tests/
 │

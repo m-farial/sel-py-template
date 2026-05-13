@@ -2,7 +2,7 @@
 Browser setup smoke tests.
 
 Simple tests to verify Chrome, Firefox, and Edge are properly configured.
-Run with: poetry run pytest tests/test_browser_setup.py --all-browsers --headed
+Run with: poetry run pytest tests/integration/test_browser_setup.py --all-browsers --headed
 """
 
 import pytest

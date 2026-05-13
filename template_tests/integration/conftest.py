@@ -74,7 +74,7 @@ def stub_logger_factory(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 @pytest.fixture()
-def browser_name(driver: WebDriver) -> str:
+def runtime_browser_name(driver: WebDriver) -> str:
     """
     Return the lowercase browser name for the active WebDriver session.
 
@@ -103,7 +103,7 @@ def browser_name(driver: WebDriver) -> str:
 
 
 @pytest.fixture()
-def resilient_page(driver: WebDriver, browser_name: str) -> BasePage:
+def resilient_page(driver: WebDriver, runtime_browser_name: str) -> BasePage:
     """
     Return a ``BasePage`` instance wired to the active driver and browser.
 
@@ -132,7 +132,7 @@ def resilient_page(driver: WebDriver, browser_name: str) -> BasePage:
 
     Args:
         driver: The active Selenium WebDriver instance.
-        browser_name: Lowercase browser name resolved by the ``browser_name``
+        runtime_browser_name: Lowercase browser name resolved by the ``runtime_browser_name``
                       fixture above.
 
     Returns:
@@ -140,9 +140,9 @@ def resilient_page(driver: WebDriver, browser_name: str) -> BasePage:
     """
     # Import is deferred to keep conftest lightweight and avoid a hard
     # dependency on the resilience test module at collection time.
-    from tests.integration.test_framework_resilience import ResilientPage
+    from template_tests.integration.test_framework_resilience import ResilientPage
 
-    return ResilientPage(driver, browser=browser_name)
+    return ResilientPage(driver, browser=runtime_browser_name)
 
 
 @pytest.fixture(scope="function")
