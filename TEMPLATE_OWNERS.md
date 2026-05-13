@@ -77,8 +77,8 @@ class LoginPage(BasePage):
 
     def login(self, username: str, password: str) -> None:
         """Enter credentials and submit the login form."""
-        self.find_element(self.USERNAME_INPUT).send_keys(username)
-        self.find_element(self.PASSWORD_INPUT).send_keys(password)
+        self.find(self.USERNAME_INPUT).send_keys(username)
+        self.find(self.PASSWORD_INPUT).send_keys(password)
         self.click(self.LOGIN_BUTTON)
 ```
 
