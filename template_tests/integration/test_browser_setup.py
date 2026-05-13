@@ -171,7 +171,7 @@ class TestBrowserSetup:
 def test_quick_browser_check(driver: WebDriver) -> None:
     """
     Quick sanity check that browser basics work.
-    Run with: poetry run pytest tests/test_browser_setup.py::test_quick_browser_check
+    Run with: poetry run pytest template_tests/integration/test_browser_setup.py::test_quick_browser_check
     """
     driver.get("https://www.example.com")
     assert "Example Domain" in driver.title

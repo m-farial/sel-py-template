@@ -10,8 +10,8 @@ that commonly cause test flakiness in CI environments.
   - Timing tests account for CI environment slowness
 
 Run with:
-  pytest tests/test_framework_resilience.py --all-browsers --headless -v
-  pytest tests/test_framework_resilience.py -m ci_critical --headless -v
+  pytest template_tests/integration/test_framework_resilience.py --all-browsers --headless -v
+  pytest template_tests/integration/test_framework_resilience.py -m ci_critical --headless -v
 """
 
 from __future__ import annotations

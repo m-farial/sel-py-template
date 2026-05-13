@@ -45,7 +45,11 @@ def collect_rule_ids(results: dict[str, Any]) -> set[str]:
     Returns:
         Set of violation ids.
     """
-    return {violation.get("id", "") for violation in results.get("violations", [])}
+    return {
+        rule_id
+        for violation in results.get("violations", [])
+        if (rule_id := violation.get("id"))
+    }
 
 
 def count_violations(results: dict[str, Any]) -> int:
