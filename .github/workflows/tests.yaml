@@ -57,7 +57,7 @@ jobs:
         env:
           PYTHONPATH: ${{ github.workspace }}/src
         run: |
-          poetry run pytest tests/unit \
+          poetry run pytest template_tests/unit \
             --cov=src/sel_py_template \
             --cov-branch \
             --cov-report=term-missing \
@@ -158,7 +158,7 @@ jobs:
         env:
           PYTHONPATH: ${{ github.workspace }}/src
         run: |
-          poetry run pytest tests/integration \
+          poetry run pytest template_tests/integration \
             -m "ci_critical" \
             --browser=chrome \
             --headless \
