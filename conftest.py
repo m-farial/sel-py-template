@@ -7,6 +7,11 @@ Integrates with existing setup while adding:
   - Test markers for categorization (ci_critical, slow, flaky)
   - Explicit timeout configuration
   - Better error messages in CI logs
+
+TEMPLATE OWNERS NOTE:
+  This file is template-owned. Downstream users should NOT modify it.
+  To customise report titles, artifact directories, and ini options,
+  edit pytest.ini in your project root instead.
 """
 
 from __future__ import annotations
@@ -146,6 +151,7 @@ def _resolve_extra_artifacts(config: pytest.Config) -> dict[str, str]:
     return {**ini_artifacts, **cli_artifacts}
 
 
+@pytest.hookimpl(tryfirst=True)
 def pytest_configure(config: pytest.Config) -> None:
     """Configure pytest at session start."""
     browser: str = config.getoption("--browser") or "generic"
@@ -154,6 +160,9 @@ def pytest_configure(config: pytest.Config) -> None:
 
     artifact_manager = _build_artifact_manager(config, browser)
     config._artifact_manager = artifact_manager  # type: ignore[attr-defined]
+
+    # Resolved final a11y session directory for this run
+    config.a11y_session_dir = artifact_manager.paths.a11y_dir  # type: ignore[attr-defined]
 
     LoggerFactory.set_browser(browser)
     LoggerFactory.set_log_dir(artifact_manager.paths.run_root)
@@ -187,13 +196,12 @@ def pytest_configure(config: pytest.Config) -> None:
 
     if not hasattr(config, "option"):
         logger.warning(
-            "config.option not available - pytest-html-plus configuration skipped. "
-            "This may indicate pytest-html-plus plugin is not installed or not loaded."
+            "config.option not available - pytest-html-plus / pytest-a11y configuration skipped. "
+            "This may indicate a plugin is not installed or not loaded."
         )
     else:
         config.option.html_output = str(artifact_manager.paths.pytest_html_dir)
         config.option.screenshots = str(artifact_manager.paths.failure_screenshots_dir)
-        config.option.a11y_reports = str(artifact_manager.paths.a11y_dir)
 
     session_logger: logging.Logger | None = getattr(config, "_logger", None)
     if session_logger:
@@ -202,7 +210,7 @@ def pytest_configure(config: pytest.Config) -> None:
         logger.debug("config._logger not available")
 
     logger.info("Pytest configured. Run root: %s", artifact_manager.paths.run_root)
-    logger.info("CI environment detected: %s", _is_ci_environment())
+    logger.info("A11y session dir: %s", config.a11y_session_dir)
 
 
 def pytest_addoption(parser: pytest.Parser) -> None:
@@ -234,14 +242,14 @@ def pytest_addoption(parser: pytest.Parser) -> None:
     )
     parser.addini(
         "report_title",
-        "Default report title",
-        default="Sauce demo tests report",
+        "Title shown in the HTML test report. Override this in your pytest.ini.",
+        default="Test Report",  # generic default — downstream projects set this in pytest.ini
     )
     parser.addoption(
         "--report-title",
         action="store",
         default=None,
-        help="Custom report title (overrides pytest.ini)",
+        help="Custom report title (overrides pytest.ini report_title)",
     )
     parser.addoption(
         "--artifacts-dir",

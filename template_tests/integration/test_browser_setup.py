@@ -2,15 +2,17 @@
 Browser setup smoke tests.
 
 Simple tests to verify Chrome, Firefox, and Edge are properly configured.
-Run with: poetry run pytest tests/test_browser_setup.py --all-browsers --headed
+Run with: poetry run pytest tests/integration/test_browser_setup.py --all-browsers --headed
 """
 
+import pytest
 from selenium.webdriver.common.by import By
 from selenium.webdriver.remote.webdriver import WebDriver
 from selenium.webdriver.support import expected_conditions as ec
 from selenium.webdriver.support.ui import WebDriverWait
 
 
+@pytest.mark.e2e
 class TestBrowserSetup:
     """Smoke tests to verify browser setup."""
 
@@ -169,7 +171,7 @@ class TestBrowserSetup:
 def test_quick_browser_check(driver: WebDriver) -> None:
     """
     Quick sanity check that browser basics work.
-    Run with: poetry run pytest tests/test_browser_setup.py::test_quick_browser_check
+    Run with: poetry run pytest template_tests/integration/test_browser_setup.py::test_quick_browser_check
     """
     driver.get("https://www.example.com")
     assert "Example Domain" in driver.title

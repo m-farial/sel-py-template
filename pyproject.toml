@@ -13,11 +13,19 @@ keywords = ["selenium", "testing", "python", "automation"]
 
 [tool.poetry.dependencies]
 python = "^3.10"
-selenium = "==4.40.0"
+selenium = "==4.41.0"
 webdriver-manager = "==4.0.2"
+pytest-a11y = {git = "https://github.com/m-farial/pytest-a11y.git"}
 
+# Template-owned package
 [[tool.poetry.packages]]
 include = "sel_py_template"
+from = "src"
+
+# User-owned pages package — downstream projects add their page objects here.
+# This is registered separately so both packages are importable after install.
+[[tool.poetry.packages]]
+include = "pages"
 from = "src"
 
 [tool.ruff]
@@ -62,14 +70,20 @@ lint = "ruff check . --fix"
 lint-check = "ruff check ."
 typecheck = "mypy src"
 check = ["fmt", "lint", "typecheck"]
-coverage = "pytest tests/unit --cov=src/sel_py_template --cov-branch --cov-report=term-missing --no-cov-on-fail --cov-report=xml --cache-clear tests/unit -q"
+coverage = "pytest template_tests/unit --cov=src/sel_py_template --cov-branch --cov-report=term-missing --no-cov-on-fail --cov-report=xml --cache-clear -q"
 
 [tool.pytest.ini_options]
+testpaths = ["template_tests/unit", "template_tests/integration"]
 minversion = "7.0"
-addopts = "-q "
-testpaths = ["tests/unit", "tests/integration"]
-report_title = "Selenium Python Template Test Report"
-markers = ["a11y: mark test to run accessibility checks"]
+addopts = "-q"
+# report_title and extra_artifacts are intentionally NOT set here.
+# Downstream users set these in their own pytest.ini at the project root.
+markers = [
+    "integration: Integration tests (all integration tests should be marked with this)",
+    "a11y: Tests for accessibility",
+    "regression: Regression tests comparing against baselines",
+    "e2e: End-to-end tests that may involve multiple steps and validations",
+]
 
 [tool.mypy]
 python_version = "3.10"
@@ -92,10 +106,10 @@ ignore_missing_imports = true
 
 [tool.coverage.run]
 branch = true
-source = ["pytest_a11y"]
+source = ["sel_py_template"]
 omit = [
     "tests/*",
-    "src/pytest_a11y/__init__.py",
+    "src/sel_py_template/__init__.py",
 ]
 
 [tool.coverage.report]
@@ -116,7 +130,7 @@ pytest-html-plus = "^0.5.0"
 pytest-cov = "^7.1.0"
 dulwich = "^1.1.0"
 urllib3 = "^2.6.3"
-authlib = "^1.6.9"
+authlib = "^1.7.2"
 
 [tool.poetry.scripts]
 fmt-lint = "scripts.fmt_lint:main"
