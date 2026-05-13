@@ -654,9 +654,10 @@ class TestFormInteractions:
         # Negative case: wrong value
         try:
             resilient_page.input_field.should_have_value("wrong")
-            raise AssertionError("Should have raised AssertionError")
         except AssertionError as e:
             logger.info(f"✓ Correctly raised AssertionError for wrong value: {e}")
+        else:
+            raise AssertionError("Expected should_have_value('wrong') to raise AssertionError")
 
 
 # ============================================================================
