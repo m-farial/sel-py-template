@@ -13,7 +13,7 @@ keywords = ["selenium", "testing", "python", "automation"]
 
 [tool.poetry.dependencies]
 python = "^3.10"
-selenium = "==4.40.0"
+selenium = "==4.44.0"
 webdriver-manager = "==4.0.2"
 
 [[tool.poetry.packages]]
