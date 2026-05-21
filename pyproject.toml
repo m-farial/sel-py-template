@@ -13,9 +13,9 @@ keywords = ["selenium", "testing", "python", "automation"]
 
 [tool.poetry.dependencies]
 python = "^3.10"
-selenium = "==4.41.0"
+selenium = ">=4.44.0,<5.0.0"
 webdriver-manager = "==4.0.2"
-pytest-a11y = {git = "https://github.com/m-farial/pytest-a11y.git"}
+pytest-a11y = {git = "https://github.com/m-farial/pytest-a11y.git", tag = "v1.0.0"}
 
 # Template-owned package
 [[tool.poetry.packages]]
