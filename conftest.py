@@ -162,7 +162,7 @@ def pytest_configure(config: pytest.Config) -> None:
     config._artifact_manager = artifact_manager  # type: ignore[attr-defined]
 
     # Resolved final a11y session directory for this run
-    config.a11y_session_dir = artifact_manager.paths.a11y_dir  # type: ignore[attr-defined]
+    config.a11y_session_dir = str(artifact_manager.paths.a11y_dir)  # type: ignore[attr-defined]
 
     LoggerFactory.set_browser(browser)
     LoggerFactory.set_log_dir(artifact_manager.paths.run_root)
