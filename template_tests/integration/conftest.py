@@ -5,6 +5,7 @@ from pathlib import Path
 import re
 from shutil import rmtree
 
+from _pytest.tmpdir import tmppath_result_key
 import pytest
 from selenium.webdriver.remote.webdriver import WebDriver
 

@@ -40,6 +40,7 @@ env/
 
 # Pytest
 .pytest_cache/
+.pytest_worker_jsons/
 .cache/
 .coverage
 htmlcov/

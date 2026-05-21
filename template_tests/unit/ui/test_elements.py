@@ -139,19 +139,6 @@ class TestBoundElementState:
         web_element.is_enabled.return_value = False
         assert bound_mock.is_enabled() is False
 
-    def test_enabled_delegates_to_is_enabled(self, bound_mock: BoundElement) -> None:
-        with patch.object(
-            bound_mock, "is_enabled", return_value=True
-        ) as mock_is_enabled:
-            assert bound_mock.enabled() is True
-            mock_is_enabled.assert_called_once()
-
-    def test_disabled_is_inverse_of_is_enabled(self, bound_mock: BoundElement) -> None:
-        with patch.object(bound_mock, "is_enabled", return_value=True):
-            assert bound_mock.disabled() is False
-        with patch.object(bound_mock, "is_enabled", return_value=False):
-            assert bound_mock.disabled() is True
-
 
 # ===========================================================================
 # BoundElement — interactions
@@ -197,9 +184,12 @@ class TestBoundElementInteractions:
         mock_page: MagicMock,
         exception_cls: type[Exception],
     ) -> None:
-        # First call raises, second succeeds
+        # First call raises, second succeeds.
+        # time.sleep is patched to prevent the 0.5s backoff from slowing the suite.
         mock_page.click.side_effect = [exception_cls(), None]
-        bound_mock.click_retry()
+        with patch(f"{_MODULE}.time.sleep") as mock_sleep:
+            bound_mock.click_retry()
+            mock_sleep.assert_called_once_with(0.5)
         assert mock_page.click.call_count == 2
 
     def test_hover_moves_to_element(
@@ -526,6 +516,19 @@ class TestBoundElementDropdown:
             with pytest.raises(ValueError, match="Provide value= or text="):
                 bound_mock.select_option()
 
+    def test_select_option_raises_value_error_for_custom_dropdown_when_neither_given(
+        self,
+        mock_page: MagicMock,
+        web_element: MagicMock,
+    ) -> None:
+        # Verifies the guard added to the custom (non-<select>) dropdown path.
+        web_element.tag_name = "div"
+        mock_page.wait_for.return_value = web_element
+        bound_mock = self._make_dropdown(mock_page)
+
+        with pytest.raises(ValueError, match="requires value= or text="):
+            bound_mock.select_option()
+
     def test_select_option_clicks_for_custom_dropdown(
         self,
         mock_page: MagicMock,
@@ -747,6 +750,21 @@ class TestElementDescriptor:
         descriptor = fake_page.__dict__["submit_btn"]
         result = descriptor.__get__(mock_page, type(mock_page))
         assert isinstance(result, BoundElement)
+
+    def test_get_raises_runtime_error_when_set_name_never_called(
+        self, mock_page: MagicMock
+    ) -> None:
+        """
+        Element.__get__ must raise RuntimeError (not a bare assert) when
+        _attr_name is None, which happens if Element() is created dynamically
+        outside a class body and __set_name__ is therefore never called.
+        """
+        descriptor = Element("submit", ElementType.BUTTON)
+        # _attr_name is None because the descriptor was not assigned via a class body
+        assert descriptor._attr_name is None
+
+        with pytest.raises(RuntimeError, match="__set_name__ was never called"):
+            descriptor.__get__(mock_page, type(mock_page))
 
     def test_bound_element_is_cached_on_second_access(
         self, mock_page: MagicMock

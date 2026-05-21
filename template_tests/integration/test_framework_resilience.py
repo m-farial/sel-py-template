@@ -24,7 +24,7 @@ from selenium.common.exceptions import NoSuchElementException, TimeoutException
 from selenium.webdriver.common.by import By
 from template_tests.integration.helpers import write_html
 
-from sel_py_template.pages.base_page import BasePage
+from sel_py_template.pages.base_page import BasePage, ElementNotFoundError
 from sel_py_template.ui.elements import Element, ElementType
 
 pytestmark = pytest.mark.integration
@@ -79,7 +79,7 @@ class TestElementFinding:
         resilient_page.navigate(url)
 
         # Try to find non-existent element with short timeout
-        with pytest.raises((TimeoutException, NoSuchElementException)) as exc_info:
+        with pytest.raises((TimeoutException, NoSuchElementException, ElementNotFoundError)) as exc_info:
             resilient_page.button.find(timeout=1)
 
         error_str: str = str(exc_info.value).lower()
@@ -657,7 +657,9 @@ class TestFormInteractions:
         except AssertionError as e:
             logger.info(f"✓ Correctly raised AssertionError for wrong value: {e}")
         else:
-            raise AssertionError("Expected should_have_value('wrong') to raise AssertionError")
+            raise AssertionError(
+                "Expected should_have_value('wrong') to raise AssertionError"
+            )
 
 
 # ============================================================================
