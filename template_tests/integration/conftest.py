@@ -1,11 +1,5 @@
 from __future__ import annotations
 
-from collections.abc import Generator
-from pathlib import Path
-import re
-from shutil import rmtree
-
-from _pytest.tmpdir import tmppath_result_key
 import pytest
 from selenium.webdriver.remote.webdriver import WebDriver
 
@@ -144,25 +138,3 @@ def resilient_page(driver: WebDriver, runtime_browser_name: str) -> BasePage:
     from template_tests.integration.test_framework_resilience import ResilientPage
 
     return ResilientPage(driver, browser=runtime_browser_name)
-
-
-@pytest.fixture(scope="function")
-def tmp_path(
-    request: pytest.FixtureRequest,
-    tmp_path_factory: pytest.TempPathFactory,
-) -> Generator[Path, None, None]:
-    """
-    Return a temporary directory named after the full test node name.
-
-    This overrides pytest's default ``tmp_path`` naming so the directory
-    remains human-readable and is not truncated to 30 characters.
-    """
-    name = re.sub(r"[\W]", "_", request.node.name)
-    path = tmp_path_factory.mktemp(name, numbered=True)
-    yield path
-
-    policy = tmp_path_factory._retention_policy
-    result_dict = request.node.stash[tmppath_result_key]
-
-    if policy == "failed" and result_dict.get("call", True):
-        rmtree(path, ignore_errors=True)

@@ -10,13 +10,14 @@ Integrates with existing setup while adding:
 
 TEMPLATE OWNERS NOTE:
   This file is template-owned. Downstream users should NOT modify it.
-  To customise report titles, artifact directories, and ini options,
-  edit pytest.ini in your project root instead.
+  To customise report titles and artifact directories, edit the ignored
+  project_settings.ini file in your project root instead.
 """
 
 from __future__ import annotations
 
 from collections.abc import Generator
+from configparser import ConfigParser
 import logging
 from pathlib import Path
 import sys
@@ -36,6 +37,9 @@ from sel_py_template.utils.logger_util import LoggerFactory
 from sel_py_template.utils.report_plugin import ReportPlugin
 
 logger: logging.Logger = logging.getLogger(__name__)
+
+_PROJECT_SETTINGS_FILENAME = "project_settings.ini"
+_PROJECT_SETTINGS_SECTION = "sel_py_template"
 
 
 def add_stream_handler(
@@ -121,7 +125,7 @@ def _parse_extra_artifact(value: str) -> tuple[str, str]:
 
 
 def _parse_extra_artifacts_from_ini(config: pytest.Config) -> dict[str, str]:
-    """Parse extra artifact definitions from pytest.ini."""
+    """Parse artifact definitions from the shared pytest configuration."""
     raw_values = config.getini("extra_artifacts")
     extra_artifacts: dict[str, str] = {}
 
@@ -130,6 +134,36 @@ def _parse_extra_artifacts_from_ini(config: pytest.Config) -> dict[str, str]:
         extra_artifacts[name] = path
 
     return extra_artifacts
+
+
+def _project_settings(config: pytest.Config) -> ConfigParser:
+    """Load optional downstream settings without replacing pytest's config."""
+    parser = ConfigParser()
+    settings_path = Path(config.rootpath) / _PROJECT_SETTINGS_FILENAME
+    if settings_path.is_file():
+        parser.read(settings_path, encoding="utf-8")
+    return parser
+
+
+def _project_setting(config: pytest.Config, name: str) -> str | None:
+    """Return a non-empty downstream setting, if configured."""
+    value = _project_settings(config).get(_PROJECT_SETTINGS_SECTION, name, fallback="")
+    return value.strip() or None
+
+
+def _parse_extra_artifacts_from_project_settings(
+    config: pytest.Config,
+) -> dict[str, str]:
+    """Parse downstream artifact definitions from project_settings.ini."""
+    value = _project_setting(config, "extra_artifacts")
+    if value is None:
+        return {}
+    return {
+        name: path
+        for name, path in (
+            _parse_extra_artifact(line) for line in value.splitlines() if line.strip()
+        )
+    }
 
 
 def _parse_extra_artifacts_from_cli(config: pytest.Config) -> dict[str, str]:
@@ -145,15 +179,28 @@ def _parse_extra_artifacts_from_cli(config: pytest.Config) -> dict[str, str]:
 
 
 def _resolve_extra_artifacts(config: pytest.Config) -> dict[str, str]:
-    """Merge ini and CLI extra artifact definitions, with CLI taking precedence."""
+    """Merge shared, downstream, and CLI artifacts; later sources win."""
     ini_artifacts = _parse_extra_artifacts_from_ini(config)
+    project_artifacts = _parse_extra_artifacts_from_project_settings(config)
     cli_artifacts = _parse_extra_artifacts_from_cli(config)
-    return {**ini_artifacts, **cli_artifacts}
+    return {**ini_artifacts, **project_artifacts, **cli_artifacts}
+
+
+def _apply_project_settings(config: pytest.Config) -> None:
+    """Apply downstream settings that are not overridden by CLI options."""
+    if config.getoption("--report-title") is not None:
+        return
+
+    project_report_title = _project_setting(config, "report_title")
+    if project_report_title is not None:
+        config.option.report_title = project_report_title
 
 
 @pytest.hookimpl(tryfirst=True)
 def pytest_configure(config: pytest.Config) -> None:
     """Configure pytest at session start."""
+    _apply_project_settings(config)
+
     browser: str = config.getoption("--browser") or "generic"
     if config.getoption("--all-browsers"):
         browser = "multi-browser"
@@ -242,14 +289,14 @@ def pytest_addoption(parser: pytest.Parser) -> None:
     )
     parser.addini(
         "report_title",
-        "Title shown in the HTML test report. Override this in your pytest.ini.",
-        default="Test Report",  # generic default — downstream projects set this in pytest.ini
+        "Title shown in the HTML test report.",
+        default="Test Report",
     )
     parser.addoption(
         "--report-title",
         action="store",
         default=None,
-        help="Custom report title (overrides pytest.ini report_title)",
+        help="Custom report title (overrides project_settings.ini)",
     )
     parser.addoption(
         "--artifacts-dir",
@@ -270,7 +317,7 @@ def pytest_addoption(parser: pytest.Parser) -> None:
     parser.addini(
         "extra_artifacts",
         type="linelist",
-        help="Additional artifact directories in NAME=PATH format.",
+        help="Template-defined artifact directories in NAME=PATH format.",
         default=[],
     )
 

@@ -162,6 +162,7 @@ jobs:
             -m "ci_critical" \
             --browser=chrome \
             --headless \
+            --a11y \
             --html-output=logs/report.html \
             -n auto
 

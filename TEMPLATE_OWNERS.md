@@ -24,7 +24,7 @@ repo root/
  ┃ ┗ example_page.py
  ┣ tests/                      ✅ USER OWNED — add your tests here
  ┣ conftest.py                 🔒 TEMPLATE OWNED — never modify
- ┣ pytest.ini                  ✅ USER OWNED — set report_title and extra_artifacts here
+ ┣ project_settings.ini        ✅ USER OWNED — ignored local report/artifact settings
  ┣ pyproject.toml              🔒 TEMPLATE OWNED — never modify
  ┗ TEMPLATE_OWNERS.md         📖 This file
 ```
@@ -50,7 +50,7 @@ Modifying any of these files will cause **merge conflicts** when you pull upstre
 |---|---|
 | `src/pages/` | Your Page Object Model classes |
 | `tests/` | Your test files and fixtures |
-| `pytest.ini` | `report_title`, `extra_artifacts`, and other pytest settings |
+| `project_settings.ini` | Local `report_title` and `extra_artifacts` settings (copy the example file) |
 
 ---
 
@@ -97,7 +97,8 @@ git fetch upstream
 git merge upstream/main
 ```
 
-Because you have never modified the template-owned files, this merge will always be conflict-free.
+Keeping project-specific files separate greatly reduces merge conflicts. Git can still
+require resolution when upstream changes overlap with local work or restructure files.
 
 If you ever see a merge conflict in a template-owned file, it means a modification
 was made to it in your project. Resolve it by accepting the upstream version:

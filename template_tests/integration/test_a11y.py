@@ -17,6 +17,7 @@ from template_tests.integration.helpers import write_html
 pytestmark = [pytest.mark.a11y, pytest.mark.integration]
 
 
+@pytest.mark.ci_critical
 @pytest.mark.a11y
 class TestA11y:
     """Accessibility plugin smoke tests and basic violation detection."""

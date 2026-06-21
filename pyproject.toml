@@ -73,12 +73,13 @@ check = ["fmt", "lint", "typecheck"]
 coverage = "pytest template_tests/unit --cov=src/sel_py_template --cov-branch --cov-report=term-missing --no-cov-on-fail --cov-report=xml --cache-clear -q"
 
 [tool.pytest.ini_options]
-testpaths = ["template_tests/unit", "template_tests/integration"]
+testpaths = ["template_tests", "tests"]
 minversion = "7.0"
 addopts = "-q"
-# report_title and extra_artifacts are intentionally NOT set here.
-# Downstream users set these in their own pytest.ini at the project root.
 markers = [
+    "ci_critical: tests that must pass in CI (failures block deployment)",
+    "slow: tests that take more than five seconds",
+    "flaky: tests that may fail intermittently and require investigation",
     "integration: Integration tests (all integration tests should be marked with this)",
     "a11y: Tests for accessibility",
     "regression: Regression tests comparing against baselines",

@@ -74,7 +74,7 @@ sel-py-template/
 ├── tests/                      ✅ USER OWNED — add your project tests here
 │
 ├── conftest.py                 🔒 TEMPLATE OWNED — browser fixtures, CI config
-├── pytest.ini                  ✅ USER OWNED — set report_title and other options
+├── project_settings.ini        ✅ USER OWNED — ignored local report/artifact settings
 ├── pyproject.toml              🔒 TEMPLATE OWNED — build and tooling config
 └── TEMPLATE_OWNERS.md          📖 Full ownership reference and update guide
 ```
@@ -159,19 +159,26 @@ Supported browsers: `chrome`, `firefox`, `edge`.
 
 ## ⚙️ Configuration
 
-Downstream projects configure the framework via `pytest.ini` at the project root.
-This file is user-owned and will never be overwritten by template updates.
+Pytest's shared configuration stays in `pyproject.toml`, so the template's markers,
+test discovery, and defaults continue to work in downstream projects. To configure a
+project without creating an upstream merge conflict, copy the example local settings:
 
 ```ini
-# pytest.ini
-[pytest]
+# project_settings.ini (gitignored)
+[sel_py_template]
 report_title = My Project Test Report
-testpaths = tests
 
 # Optional: register additional artifact directories
 # extra_artifacts =
 #     downloads=downloads
 ```
+
+```bash
+cp project_settings.ini.example project_settings.ini
+```
+
+`poetry run pytest` runs both the framework's `template_tests/` and your project's
+`tests/`. Run either directory explicitly when you only want one suite.
 
 All browser options, artifact paths, and CI behaviour are controlled via
 `conftest.py` (template-owned) and can be overridden via CLI flags:
@@ -182,7 +189,7 @@ All browser options, artifact paths, and CI behaviour are controlled via
 | `--all-browsers` | off | Run on all three browsers |
 | `--interactive` | off | Show the browser window (disables headless) |
 | `--artifacts-dir` | `artifacts` | Base directory for all test output |
-| `--report-title` | from `pytest.ini` | Override the HTML report title |
+| `--report-title` | from `project_settings.ini` | Override the HTML report title |
 | `--extra-artifact NAME=PATH` | — | Register additional artifact directories |
 
 ---
@@ -262,8 +269,9 @@ git fetch upstream
 git merge upstream/main
 ```
 
-This is conflict-free as long as you only add code to the user-owned locations
-(`src/pages/`, `tests/`, `pytest.ini`) and never modify template-owned files.
+Keeping changes in user-owned locations (`src/pages/`, `tests/`, and the ignored
+`project_settings.ini`) greatly reduces merge conflicts. As with any Git merge,
+upstream restructures or overlapping edits can still require resolution.
 
 See `TEMPLATE_OWNERS.md` for the full ownership map and conflict resolution guide.
 
