@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import Enum
+import time
 from typing import cast
 
 from selenium.common.exceptions import (
@@ -94,12 +95,6 @@ class BoundElement:
         )
         return bool(self.find(timeout=timeout).is_enabled())
 
-    def enabled(self, timeout: int | None = None) -> bool:
-        return self.is_enabled(timeout=timeout)
-
-    def disabled(self, timeout: int | None = None) -> bool:
-        return not self.is_enabled(timeout=timeout)
-
     # ---------- common interactions ----------
     def scroll_into_view(self) -> BoundElement:
         self.page.logger.debug(
@@ -139,10 +134,11 @@ class BoundElement:
             )
         except (ElementClickInterceptedException, StaleElementReferenceException):
             self.page.logger.warning(
-                "Click intercepted or stale for element name=%s locator=%s. Retrying once.",
+                "Click intercepted or stale for element name=%s locator=%s. Retrying once after backoff.",
                 self.defn.name,
                 self.locator,
             )
+            time.sleep(0.5)
             self.scroll_into_view()
             self.page.click(self.locator, timeout=timeout or self.defn.timeout_s)
             self.page.logger.debug(
@@ -340,6 +336,11 @@ class BoundElement:
     def select_option(
         self, *, value: str | None = None, text: str | None = None
     ) -> None:
+        """
+        Native-first dropdown selection:
+          - If the element is a <select>, use selenium.support.ui.Select
+          - Otherwise treat as a trigger (click to open), and let the test/page define option elements.
+        """
         self.page.logger.debug(
             "Selecting dropdown option for element name=%s locator=%s value=%r text=%r",
             self.defn.name,
@@ -347,11 +348,6 @@ class BoundElement:
             value,
             text,
         )
-        """
-        Native-first dropdown selection:
-          - If the element is a <select>, use selenium.support.ui.Select
-          - Otherwise treat as a trigger (click to open), and let the test/page define option elements.
-        """
         if self.defn.element_type != ElementType.DROPDOWN:
             raise TypeError("select_option() only supports DROPDOWN")
 
@@ -381,6 +377,11 @@ class BoundElement:
             return
 
         # Custom dropdown: open it; option selection is app-specific.
+        if value is None and text is None:
+            raise ValueError(
+                f"[{self.defn.name}] select_option() requires value= or text= "
+                "even for custom dropdowns, to document intent."
+            )
         self.page.logger.debug(
             "Using custom dropdown click flow for element name=%s locator=%s",
             self.defn.name,
@@ -474,7 +475,12 @@ class Element:
         if instance is None:
             return self
 
-        assert self._attr_name is not None
+        if self._attr_name is None:
+            raise RuntimeError(
+                f"{self.__class__.__name__} was not assigned via a class body — "
+                "__set_name__ was never called. Ensure the Element is declared "
+                "as a class-level attribute, not created dynamically."
+            )
         instance.logger.debug(
             "Resolving bound element attr=%s locator=%s type=%s",
             self._attr_name,

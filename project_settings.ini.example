@@ -1,0 +1,10 @@
+[sel_py_template]
+# This file is deliberately separate from pytest's configuration. Copy it to
+# project_settings.ini (which is gitignored) and customise it for your project.
+report_title = My Project Test Report
+
+# One NAME=PATH entry per line. Relative paths are created inside each run's
+# artifact directory.
+# extra_artifacts =
+#     downloads=downloads
+#     screenshots=screenshots

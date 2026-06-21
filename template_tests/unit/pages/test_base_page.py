@@ -13,7 +13,12 @@ from selenium.common.exceptions import (
     WebDriverException,
 )
 from selenium.webdriver.common.alert import Alert
-from tests.unit.conftest import BASE_TIMEOUT, LOCATOR, FakeWebDriver, FakeWebElement
+from template_tests.unit.conftest import (
+    BASE_TIMEOUT,
+    LOCATOR,
+    FakeWebDriver,
+    FakeWebElement,
+)
 
 from sel_py_template.pages.base_page import (
     BasePage,
