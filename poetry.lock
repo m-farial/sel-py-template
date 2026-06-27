@@ -2266,18 +2266,19 @@ testing = ["process-tests", "pytest-xdist", "virtualenv"]
 
 [[package]]
 name = "pytest-html-plus"
-version = "0.5.0"
+version = "1.1.0"
 description = "Generate Actionable, automatic screenshots, unified Mobile friendly Pytest HTML report in less than 3 seconds — no hooks, merge plugins, no config, xdist-ready."
 optional = false
-python-versions = "<4.0,>=3.9"
+python-versions = "<4.0,>=3.10"
 groups = ["dev"]
 files = [
-    {file = "pytest_html_plus-0.5.0-py3-none-any.whl", hash = "sha256:0d28e16e01b9b42ca32b82785b13b0b0c83bae04dfc6e52418d92ece28b5a454"},
-    {file = "pytest_html_plus-0.5.0.tar.gz", hash = "sha256:a6e64161b9afe5ac676656f94ceddb815f6f8e12043020f96f3758db95d3ec2e"},
+    {file = "pytest_html_plus-1.1.0-py3-none-any.whl", hash = "sha256:c13031d4abb03672221df8ec3326fbb0a11d87ac0d0803a9077db37b63575855"},
+    {file = "pytest_html_plus-1.1.0.tar.gz", hash = "sha256:f9cf1b76ea6ae48a315b53303e80b45da1d0e69ec46180b38fdb06beb4e8e2c4"},
 ]
 
 [package.dependencies]
 keyring = ">=25.6.0,<26.0.0"
+tomli = {version = ">=2.0.1,<3.0.0", markers = "python_version < \"3.11\""}
 yagmail = ">=0.15.293,<0.16.0"
 
 [[package]]
@@ -3203,4 +3204,4 @@ type = ["pytest-mypy"]
 [metadata]
 lock-version = "2.1"
 python-versions = "^3.10"
-content-hash = "ecbbf4a490cd569685333f387873706a78574cc130fb3cc1534f170664593ed6"
+content-hash = "120c8eb3dc14b4f4c72f1856ae28a85ff008ce44909884c713feb803ddce3f01"
