@@ -148,7 +148,7 @@ Assertions live **on the element**, keeping tests expressive and consistent.
 
 ## Supported Element Types
 
-```python
+```text
 BUTTON, LINK, TEXT_INPUT, TEXTAREA, DROPDOWN,
 CHECKBOX, RADIO, TOGGLE, TAB, MENU_ITEM,
 MODAL, TOAST, PAGINATION

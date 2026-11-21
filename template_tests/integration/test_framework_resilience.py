@@ -79,7 +79,9 @@ class TestElementFinding:
         resilient_page.navigate(url)
 
         # Try to find non-existent element with short timeout
-        with pytest.raises((TimeoutException, NoSuchElementException, ElementNotFoundError)) as exc_info:
+        with pytest.raises(
+            (TimeoutException, NoSuchElementException, ElementNotFoundError)
+        ) as exc_info:
             resilient_page.button.find(timeout=1)
 
         error_str: str = str(exc_info.value).lower()

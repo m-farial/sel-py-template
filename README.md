@@ -100,11 +100,18 @@ from sel_py_template.ui.elements import Element, ElementType
 
 
 class LoginPage(BasePage):
-
-    username_input: Element = Element("user-name", ElementType.TEXT_INPUT, by=By.ID, name="Username")
-    password_input: Element = Element("password", ElementType.TEXT_INPUT, by=By.ID, name="Password")
-    login_button: Element = Element("login-button", ElementType.BUTTON, by=By.ID, name="Login Button")
-    error_message: Element = Element(".error-message", ElementType.TOAST, by=By.CSS_SELECTOR, name="Error")
+    username_input: Element = Element(
+        "user-name", ElementType.TEXT_INPUT, by=By.ID, name="Username"
+    )
+    password_input: Element = Element(
+        "password", ElementType.TEXT_INPUT, by=By.ID, name="Password"
+    )
+    login_button: Element = Element(
+        "login-button", ElementType.BUTTON, by=By.ID, name="Login Button"
+    )
+    error_message: Element = Element(
+        ".error-message", ElementType.TOAST, by=By.CSS_SELECTOR, name="Error"
+    )
 
     def __init__(self, driver: WebDriver, browser: str, timeout: int = 10) -> None:
         super().__init__(driver, browser=browser, timeout=timeout)
@@ -131,6 +138,7 @@ def test_login_valid_credentials(driver, browser_name):
     page = LoginPage(driver, browser=browser_name)
     page.login("standard_user", "secret_sauce")
     # assert your post-login state here
+
 
 def test_login_invalid_credentials(driver, browser_name):
     page = LoginPage(driver, browser=browser_name)
