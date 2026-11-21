@@ -116,7 +116,9 @@ pytest --pdb
 Add breakpoints:
 
 ```python
-import pdb; pdb.set_trace()
+import pdb
+
+pdb.set_trace()
 ```
 
 ---
